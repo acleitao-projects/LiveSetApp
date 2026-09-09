@@ -1,10 +1,12 @@
 # LiveSet 1
 
+[Live demo](https://acleitao-projects.github.io/LiveSetApp/)
+
 Local-first PWA for live-performance musicians. Pick an audio file, get lyrics with chords and diagrams, build a set list, and edit that set list freely while the current song keeps playing.
 
 Name inspired by Capture One — for the stage, not the studio.
 
-## Run
+## Run locally
 
 From this directory:
 
