@@ -1,7 +1,7 @@
 // App-wide settings persisted in the appSettings IndexedDB store. Each setting is
 // a separate record keyed by id so we can atomically write one without loading all.
 
-import {repository} from './storage.js?v=33';
+import {repository} from './storage.js?v=35';
 
 const DEFAULTS = {
   fontScale: 1.0,          // multiplier on the cifra base font-size

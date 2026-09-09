@@ -1,22 +1,23 @@
 // Query string on each import busts browser + service-worker cache when we push
-// changes. Bump BUILD when any of these files change together, or bump the file's
-// own suffix if only one changed.
-const BUILD='33';
-import {repository,storageCapabilities,storageEstimate} from './storage.js?v=33';
-import {newSetlist,trackItem,breakItem,uid} from './models.js?v=33';
-import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=33';
-import {AudioEngine} from './audio.js?v=33';
-import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=33';
-import {parseCifra} from './cifra.js?v=33';
-import {chordDiagramSvg} from './chords.js?v=33';
-import {advanceCifraScroll} from './cifra-scroll.js?v=33';
-import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=33';
-import {icon} from './icons.js?v=33';
-import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=33';
-import {searchCifraClub,fetchCifraFromUrl} from './cifraclub-import.js?v=33';
-import {track,trackBoot,trackView} from './analytics.js?v=33';
-import {loadSettings,saveSetting,clampFontScale} from './settings-service.js?v=33';
-import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=33';
+// changes. Bump BUILD (and search-replace ?v=NN across app-v2.js, song-service.js,
+// backup-service.js, and settings-service.js) whenever ANY internal module changes.
+// Skipping this bump is what causes stale-icon / stale-module bugs after deploys.
+const BUILD='35';
+import {repository,storageCapabilities,storageEstimate} from './storage.js?v=35';
+import {newSetlist,trackItem,breakItem,uid} from './models.js?v=35';
+import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=35';
+import {AudioEngine} from './audio.js?v=35';
+import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=35';
+import {parseCifra} from './cifra.js?v=35';
+import {chordDiagramSvg} from './chords.js?v=35';
+import {advanceCifraScroll} from './cifra-scroll.js?v=35';
+import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=35';
+import {icon} from './icons.js?v=35';
+import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=35';
+import {searchCifraClub,fetchCifraFromUrl} from './cifraclub-import.js?v=35';
+import {track,trackBoot,trackView} from './analytics.js?v=35';
+import {loadSettings,saveSetting,clampFontScale} from './settings-service.js?v=35';
+import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=35';
 
 const app=document.querySelector('#app');
 const engine=new AudioEngine();
@@ -1154,7 +1155,7 @@ async function boot(){
   render();
   if('serviceWorker'in navigator){
     try{
-      swRegistration=await navigator.serviceWorker.register('./sw.js?v=14');
+      swRegistration=await navigator.serviceWorker.register('./sw.js?v=15');
       // A new SW is already waiting (installed on a previous visit but never activated)
       if(swRegistration.waiting&&navigator.serviceWorker.controller){updateAvailable=true;render();}
       swRegistration.addEventListener('updatefound',()=>{
