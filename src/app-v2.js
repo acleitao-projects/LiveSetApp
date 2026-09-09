@@ -279,7 +279,7 @@ function renderEditSheet(){
       <div class="field" style="flex:1;min-height:280px">
         <label for="editCifra">${esc(t('cifra'))}
           <span class="cifra-import-actions">
-            <button class="btn small" id="importCifraClub">${icon('music')}${esc(t('import_cifraclub'))}</button>
+            <button class="btn small" id="importCifraClub" hidden>${icon('music')}${esc(t('import_cifraclub'))}</button>
             <button class="btn small" id="importCifra">${icon('file')}${esc(t('import_txt_cho'))}</button>
           </span>
         </label>
