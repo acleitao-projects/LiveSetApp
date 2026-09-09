@@ -44,7 +44,11 @@ let installPrompt=null;
 let installed=false;
 let cifraClubSearch=null; // {artist, query, loading, results, error}
 let settingsSheetOpen=false;
-let onboardingStep=null; // null | 0..3
+let drawerMoreOpen=false;
+let onboardingStep=null; // null | 0..4
+let previousDrawerOpen=false;
+let previousEditSheet=false;
+let previousSettingsOpen=false;
 let fontScale=1.0;
 let wakeLockSentinel=null;
 let backupInputEl=null;
@@ -93,6 +97,17 @@ function render(){
   const songChanged=currentSongId!==lastRenderedSongId;
   const prevScroll=songChanged?0:(document.querySelector('#cifraScroll')?.scrollTop||0);
   lastRenderedSongId=currentSongId;
+  // Skip slide/fade animations when the surface was already visible on the previous
+  // render — otherwise mutations like reorder cause a jarring re-open flash.
+  const drawerAnimClass=drawerOpen&&previousDrawerOpen?' no-anim':'';
+  const sheetAnimClass=editSheet&&previousEditSheet?' no-anim':'';
+  const settingsAnimClass=settingsSheetOpen&&previousSettingsOpen?' no-anim':'';
+  previousDrawerOpen=drawerOpen;
+  previousEditSheet=!!editSheet;
+  previousSettingsOpen=settingsSheetOpen;
+  render.drawerAnim=drawerAnimClass;
+  render.sheetAnim=sheetAnimClass;
+  render.settingsAnim=settingsAnimClass;
   const parsed=song?.cifraSource?parseCifra(song.cifraSource):null;
   const transposed=parsed?applyTranspose(parsed,song.transposeSemitones||0):null;
   const nextItem=resolveNext(working,activeBreak?.id||engine.session?.originatingSetlistItemId,engine.session?.lastKnownOrder||[]);
@@ -242,8 +257,9 @@ function renderDrawer(){
   const dirty=isDirty(working,saved);
   const lang=getLanguage();
   const showInstall=!installed&&(installPrompt||(/iPad|iPhone|iPod/.test(navigator.userAgent)&&!matchMedia('(display-mode: standalone)').matches));
-  return `<div class="drawer-scrim" id="drawerScrim"></div>
-  <aside class="drawer">
+  const anim=render.drawerAnim||'';
+  return `<div class="drawer-scrim${anim}" id="drawerScrim"></div>
+  <aside class="drawer${anim}">
     <div class="drawer-head">
       <h2>${esc(t('set_list'))}</h2>
       <button class="btn icon ghost" id="closeDrawer" aria-label="${esc(t('close_set_list'))}">${icon('close')}</button>
@@ -275,6 +291,14 @@ function renderDrawer(){
         ${supportedLanguages().map(code=>`<button class="lang-chip ${code===lang?'active':''}" data-lang="${code}">${code.toUpperCase()}</button>`).join('')}
       </div>
       <div class="drawer-foot-actions">
+        <div class="drawer-more phone-only" style="position:relative">
+          <button class="btn icon ghost" id="openDrawerMore" aria-label="${esc(t('more'))}" title="${esc(t('more'))}" aria-expanded="${drawerMoreOpen}">${icon('moreVertical')}</button>
+          ${drawerMoreOpen?`<div class="drawer-more-menu" role="menu">
+            <button role="menuitem" class="drawer-more-item" id="duplicateSet">${icon('copy')}<span>${esc(t('duplicate'))}</span></button>
+            <button role="menuitem" class="drawer-more-item" id="shareSet">${icon('share')}<span>${esc(t('share'))}</span></button>
+            <button role="menuitem" class="drawer-more-item" id="importShare">${icon('upload')}<span>${esc(t('import_share'))}</span></button>
+          </div>`:''}
+        </div>
         <button class="btn icon ghost" id="openSettings" aria-label="${esc(t('settings'))}" title="${esc(t('settings'))}">${icon('gear')}</button>
         ${showInstall?`<button class="btn small install-btn" id="installApp">${icon('save')}${esc(t('install'))}</button>`:''}
       </div>
@@ -313,8 +337,9 @@ function renderEditSheet(){
   const song=songById(editSheet.songId);
   if(!song)return '';
   const mp3SaveHint=/\.mp3$/i.test(song.originalFilename||'')?t(song.source?.kind==='handle'?'mp3_save_hint_original':'mp3_save_hint_copy'):'';
-  return `<div class="sheet-scrim" id="sheetScrim"></div>
-  <aside class="sheet">
+  const anim=render.sheetAnim||'';
+  return `<div class="sheet-scrim${anim}" id="sheetScrim"></div>
+  <aside class="sheet${anim}">
     <div class="sheet-head">
       <h2>${esc(t('edit_song'))}</h2>
       <button class="btn icon ghost" id="closeSheet" aria-label="${esc(t('cancel'))}">${icon('close')}</button>
@@ -342,21 +367,31 @@ function renderEditSheet(){
   </aside>`;
 }
 
-function renderOnboarding(){
-  const step=onboardingStep;
-  const steps=[
+function onboardingSteps(){
+  const base=[
     {title:t('onboard_welcome_title'),body:t('onboard_welcome_body'),icon:'music'},
     {title:t('onboard_add_title'),body:t('onboard_add_body'),icon:'plus'},
     {title:t('onboard_edit_title'),body:t('onboard_edit_body'),icon:'edit'},
     {title:t('onboard_play_title'),body:t('onboard_play_body'),icon:'play'}
   ];
-  const s=steps[step]||steps[0];
+  const iosStandalone=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!matchMedia('(display-mode: standalone)').matches;
+  const canInstall=!installed&&(installPrompt||iosStandalone);
+  if(canInstall)base.push({title:t('onboard_install_title'),body:iosStandalone?t('onboard_install_body_ios'):t('onboard_install_body'),icon:'download',install:true});
+  return base;
+}
+
+function renderOnboarding(){
+  const steps=onboardingSteps();
+  const step=Math.min(onboardingStep??0,steps.length-1);
+  const s=steps[step];
   const isLast=step>=steps.length-1;
+  const showInstallCta=s.install&&(installPrompt||/iPad|iPhone|iPod/.test(navigator.userAgent));
   return `<div class="modal-scrim">
     <div class="modal onboarding-modal" role="dialog" aria-modal="true">
       <div class="onboarding-icon">${icon(s.icon)}</div>
       <h2>${esc(s.title)}</h2>
       <p class="muted">${esc(s.body)}</p>
+      ${showInstallCta?`<button class="btn primary install-btn" id="onboardingInstall" style="width:100%;margin-bottom:14px">${icon('download')}${esc(t('install'))}</button>`:''}
       <div class="onboarding-dots">${steps.map((_,i)=>`<span class="dot ${i===step?'active':''}"></span>`).join('')}</div>
       <div class="modal-actions">
         <button class="btn ghost" id="onboardingSkip">${esc(t('skip'))}</button>
@@ -792,6 +827,8 @@ app.addEventListener('click',async event=>{
   const target=event.target;
 
   // Scrim clicks dismiss overlays (checked before the button selector so plain divs work)
+  // Close the drawer-more popover on any click outside it
+  if(drawerMoreOpen&&!target.closest('.drawer-more')){drawerMoreOpen=false;render();}
   if(target.id==='drawerScrim'){drawerOpen=false;return render();}
   if(target.id==='sheetScrim'){editSheet=null;return render();}
   if(target.id==='newSetScrim'){newSetModalOpen=false;return render();}
@@ -812,18 +849,32 @@ app.addEventListener('click',async event=>{
   }
 
   try{
-    if(btn.id==='openSettings'){settingsSheetOpen=true;track('open_settings');return render();}
+    if(btn.id==='openDrawerMore'){drawerMoreOpen=!drawerMoreOpen;return render();}
+    if(btn.id==='openSettings'){settingsSheetOpen=true;drawerMoreOpen=false;track('open_settings');return render();}
     if(btn.id==='closeSettings'){settingsSheetOpen=false;return render();}
     if(btn.id==='fontScaleUp'){await adjustFontScale(0.1);return render();}
     if(btn.id==='fontScaleDown'){await adjustFontScale(-0.1);return render();}
     if(btn.id==='backupExport'){await runBackupExport();return;}
     if(btn.id==='backupImport'){triggerBackupImport();return;}
-    if(btn.id==='duplicateSet'){await runDuplicateSet();return;}
-    if(btn.id==='shareSet'){await runShareSet();return;}
-    if(btn.id==='importShare'){triggerShareImport();return;}
+    if(btn.id==='duplicateSet'){drawerMoreOpen=false;await runDuplicateSet();return;}
+    if(btn.id==='shareSet'){drawerMoreOpen=false;await runShareSet();return;}
+    if(btn.id==='importShare'){drawerMoreOpen=false;triggerShareImport();return;}
     if(btn.id==='onboardingSkip'){await finishOnboarding(true);return render();}
-    if(btn.id==='onboardingNext'){onboardingStep=(onboardingStep??0)+1;if(onboardingStep>3)await finishOnboarding(false);return render();}
+    if(btn.id==='onboardingNext'){
+      const total=onboardingSteps().length;
+      onboardingStep=(onboardingStep??0)+1;
+      if(onboardingStep>=total)await finishOnboarding(false);
+      return render();
+    }
     if(btn.id==='onboardingBack'){onboardingStep=Math.max(0,(onboardingStep??0)-1);return render();}
+    if(btn.id==='onboardingInstall'){
+      track('install_from_onboarding');
+      if(installPrompt){
+        try{await installPrompt.prompt();const choice=await installPrompt.userChoice;track(choice?.outcome==='accepted'?'install_accepted':'install_declined');if(choice?.outcome==='accepted')installed=true;installPrompt=null;}
+        catch(_){/* ignore */}
+      }else{alert(t('install_ios_hint'));}
+      return render();
+    }
     if(btn.id==='openDrawer'){drawerOpen=true;track('open_drawer');return render();}
     if(btn.id==='closeDrawer'){drawerOpen=false;return render();}
     if(btn.id==='fullscreenToggle'){fullscreen=true;track('fullscreen_toggle',{enabled:true});return render();}

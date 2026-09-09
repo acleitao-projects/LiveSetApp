@@ -161,7 +161,11 @@ const DICTS = {
     onboard_edit_title: 'Add lyrics and chords',
     onboard_edit_body: "Tap the pencil on any song to paste a cifra, import a .txt or .cho file, or type notes. Transpose and speed save automatically per song.",
     onboard_play_title: 'Play and edit live',
-    onboard_play_body: "Hit play. You can reorder, add, remove, transpose, and edit while the music plays — the audio never stops. Save the set list when you're ready."
+    onboard_play_body: "Hit play. You can reorder, add, remove, transpose, and edit while the music plays — the audio never stops. Save the set list when you're ready.",
+    onboard_install_title: 'Install for the stage',
+    onboard_install_body: 'Install LiveSet as a real app so it opens instantly, runs offline, and stays out of your browser tabs during a gig.',
+    onboard_install_body_ios: 'Add LiveSet to your Home Screen: tap Share, then Add to Home Screen. It runs instantly, offline, without the browser bar.',
+    more: 'More'
   },
   pt: {
     ready: 'Pronto',
@@ -302,7 +306,11 @@ const DICTS = {
     onboard_edit_title: 'Adicione letra e cifra',
     onboard_edit_body: 'Toque no lápis de qualquer música para colar uma cifra, importar um .txt ou .cho, ou escrever anotações. Transposição e velocidade salvam automaticamente por música.',
     onboard_play_title: 'Toque e edite ao vivo',
-    onboard_play_body: 'Aperte play. Você pode reordenar, adicionar, remover, transpor e editar enquanto toca — o áudio nunca para. Salve o repertório quando estiver pronto.'
+    onboard_play_body: 'Aperte play. Você pode reordenar, adicionar, remover, transpor e editar enquanto toca — o áudio nunca para. Salve o repertório quando estiver pronto.',
+    onboard_install_title: 'Instale para o palco',
+    onboard_install_body: 'Instale o LiveSet como um app de verdade — abre instantâneo, funciona offline e não fica preso nas abas do navegador durante o show.',
+    onboard_install_body_ios: 'Adicione o LiveSet à Tela de Início: toque em Compartilhar e depois em Adicionar à Tela de Início. Abre instantâneo, offline, sem a barra do navegador.',
+    more: 'Mais'
   }
 };
 
