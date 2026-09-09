@@ -46,20 +46,22 @@ function preferHandlePath(){
   return caps.fileSystemAccess;
 }
 
-export async function pickAndRegisterSong(){
-  if(preferHandlePath())return pickViaHandle();
-  return pickViaInputCopy();
+// Multi-file entry point. Returns an array of registered Song records (existing or new).
+export async function pickAndRegisterSongs(){
+  if(preferHandlePath())return pickViaHandleMulti();
+  return pickViaInputCopyMulti();
 }
 
-async function pickViaHandle(){
-  const [handle]=await window.showOpenFilePicker({
-    multiple:false,
-    types:[{description:'Audio',accept:{'audio/*':['.mp3','.m4a','.aac','.wav','.flac','.ogg','.oga','.opus']}}]
-  });
+// Back-compat single-file wrapper.
+export async function pickAndRegisterSong(){
+  const list=await pickAndRegisterSongs();
+  return list?.[0]||null;
+}
+
+async function registerFromHandle(handle){
   const file=await handle.getFile();
   const existing=await dedupeMatch(file.name,file.size);
   if(existing){
-    // update handle in case it moved
     existing.source={kind:'handle',handle};
     existing.updatedAt=new Date().toISOString();
     await repository.songs.put(existing);
@@ -78,6 +80,19 @@ async function pickViaHandle(){
   });
   await repository.songs.put(song);
   return song;
+}
+
+async function pickViaHandleMulti(){
+  const handles=await window.showOpenFilePicker({
+    multiple:true,
+    types:[{description:'Audio',accept:{'audio/*':['.mp3','.m4a','.aac','.wav','.flac','.ogg','.oga','.opus']}}]
+  });
+  const registered=[];
+  for(const handle of handles){
+    try{registered.push(await registerFromHandle(handle));}
+    catch(_){/* skip one bad file; keep the rest */}
+  }
+  return registered;
 }
 
 export async function registerFromInputFile(file){
@@ -105,14 +120,19 @@ export async function registerFromInputFile(file){
   }
 }
 
-async function pickViaInputCopy(){
+async function pickViaInputCopyMulti(){
   return new Promise((resolve,reject)=>{
     const input=document.createElement('input');
-    input.type='file';input.accept=AUDIO_ACCEPT;
+    input.type='file';input.accept=AUDIO_ACCEPT;input.multiple=true;
     input.onchange=async()=>{
-      const file=input.files?.[0];
-      if(!file)return resolve(null);
-      try{resolve(await registerFromInputFile(file));}catch(error){reject(error);}
+      const files=[...(input.files||[])];
+      if(!files.length)return resolve([]);
+      const registered=[];
+      for(const file of files){
+        try{registered.push(await registerFromInputFile(file));}
+        catch(_){/* skip failed file; keep the rest */}
+      }
+      resolve(registered);
     };
     input.click();
   });

@@ -2,7 +2,7 @@ import {repository,storageCapabilities,storageEstimate} from './storage.js';
 import {newSetlist,trackItem,breakItem} from './models.js';
 import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js';
 import {AudioEngine} from './audio.js';
-import {pickAndRegisterSong,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js';
+import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js';
 import {parseCifra} from './cifra.js';
 import {chordDiagramSvg} from './chords.js';
 import {advanceCifraScroll} from './cifra-scroll.js';
@@ -10,6 +10,7 @@ import {transposeChordLine,transposeChordSymbol} from './transpose.js';
 import {icon} from './icons.js';
 import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js';
 import {searchCifraClub,fetchCifraFromUrl} from './cifraclub-import.js';
+import {track,trackBoot,trackView} from './analytics.js';
 
 const app=document.querySelector('#app');
 const engine=new AudioEngine();
@@ -387,6 +388,7 @@ function updateChordHighlight(area){
 async function enterBreak(item){
   activeBreak=item;
   if(engine.session&&!engine.paused)await engine.toggle();
+  track('enter_break',{minutes:item.durationMinutes});
   render();
 }
 
@@ -399,8 +401,10 @@ async function playItemById(itemId){
   activeBreak=null;
   try{
     const url=await songUrl(song);
+    const wasSameSong=engine.session?.songId===song.id;
     await engine.playSong(song,item.id,url,workingItemIds());
     engine.updateLastKnownOrder(workingItemIds());
+    if(!wasSameSong)track('play_song',{has_cifra:!!(song.cifraSource&&song.cifraSource.trim()),transposed:!!song.transposeSemitones,source_kind:song.source?.kind||'unknown'});
     render();
   }catch(error){
     setStatus(error.message||t('playback_failed'),true);
@@ -440,16 +444,23 @@ async function persistTranspose(delta){
 
 async function pickSongAndAppend(){
   try{
-    const song=await pickAndRegisterSong();
-    if(!song)return;
-    if(!songs.find(s=>s.id===song.id))songs=[...songs,song];
-    else songs=songs.map(s=>s.id===song.id?song:s);
-    const item=trackItem(song.id);
-    if(pendingInsertAfter)insertAfter(working,pendingInsertAfter,item);
-    else appendTrack(working,song.id);
+    const picked=await pickAndRegisterSongs();
+    if(!picked||!picked.length)return;
+    for(const song of picked){
+      if(!songs.find(s=>s.id===song.id))songs=[...songs,song];
+      else songs=songs.map(s=>s.id===song.id?song:s);
+    }
+    // Preserve list order: insert all consecutively after pendingInsertAfter
+    let anchor=pendingInsertAfter;
+    for(const song of picked){
+      const item=trackItem(song.id);
+      if(anchor){insertAfter(working,anchor,item);anchor=item.id;}
+      else appendTrack(working,song.id);
+    }
     pendingInsertAfter=null;
     engine.updateLastKnownOrder(workingItemIds());
-    setStatus(t('added_song',{title:song.title}));
+    setStatus(picked.length===1?t('added_song',{title:picked[0].title}):t('added_songs',{count:picked.length}));
+    track(picked.length===1?'import_song':'import_multiple',{count:picked.length});
     render();
   }catch(error){
     if(error?.name==='AbortError')return;
@@ -508,8 +519,10 @@ async function runCifraClubSearch(){
     const results=await searchCifraClub({artist:artistInput,query:queryInput});
     cifraClubSearch.results=results;
     if(!results.length)cifraClubSearch.error=t('cifraclub_no_results');
+    track('cifraclub_search',{results:results.length,had_query:!!queryInput.trim()});
   }catch(error){
     cifraClubSearch.error=ccErrorMessage(error);
+    track('cifraclub_search_error',{code:error?.message||'unknown'});
   }finally{
     cifraClubSearch.loading=false;render();
   }
@@ -526,6 +539,7 @@ async function pickCifraClubResult(url){
     if(!editSheet.artist&&result.artist)editSheet.artist=result.artist;
     cifraClubSearch=null;
     setStatus(t('cifraclub_ok'));
+    track('cifraclub_import_success',{cifra_length:result.cifra.length});
   }catch(error){
     cifraClubSearch.error=ccErrorMessage(error);
     cifraClubSearch.loading=false;
@@ -542,6 +556,7 @@ async function saveEditSheet(){
     songs=songs.map(s=>s.id===updated.id?updated:s);
     editSheet=null;
     setStatus(t(result.metadataWritten?'song_mp3_saved':'song_saved'));
+    track('save_song_edits',{mp3_written:!!result.metadataWritten,cifra_length:(cifra||'').length});
     render();
   }catch(error){
     setStatus(error.message||t('save_failed'),true);
@@ -562,7 +577,7 @@ app.addEventListener('click',async event=>{
 
   // Language chip
   const langBtn=target.closest('.lang-chip[data-lang]');
-  if(langBtn){await setLanguage(langBtn.dataset.lang);return render();}
+  if(langBtn){track('language_change',{to:langBtn.dataset.lang});await setLanguage(langBtn.dataset.lang);return render();}
 
   const btn=target.closest('button,select,label,.row.track,.chord-card');
   if(!btn)return;
@@ -574,34 +589,41 @@ app.addEventListener('click',async event=>{
   }
 
   try{
-    if(btn.id==='openDrawer'){drawerOpen=true;return render();}
+    if(btn.id==='openDrawer'){drawerOpen=true;track('open_drawer');return render();}
     if(btn.id==='closeDrawer'){drawerOpen=false;return render();}
-    if(btn.id==='fullscreenToggle'){fullscreen=true;return render();}
-    if(btn.id==='fullscreenExit'){fullscreen=false;return render();}
-    if(btn.id==='applyUpdate'){navigator.serviceWorker?.controller?.postMessage({type:'SKIP_WAITING'});location.reload();return;}
+    if(btn.id==='fullscreenToggle'){fullscreen=true;track('fullscreen_toggle',{enabled:true});return render();}
+    if(btn.id==='fullscreenExit'){fullscreen=false;track('fullscreen_toggle',{enabled:false});return render();}
+    if(btn.id==='applyUpdate'){track('apply_update');navigator.serviceWorker?.controller?.postMessage({type:'SKIP_WAITING'});location.reload();return;}
     if(btn.id==='installApp'){
       if(installPrompt){
-        try{await installPrompt.prompt();const choice=await installPrompt.userChoice;if(choice?.outcome==='accepted')installed=true;installPrompt=null;render();}
-        catch(_){/* ignore */}
-      }else{alert(t('install_ios_hint'));}
+        try{
+          track('install_prompt_shown');
+          await installPrompt.prompt();
+          const choice=await installPrompt.userChoice;
+          track(choice?.outcome==='accepted'?'install_accepted':'install_declined');
+          if(choice?.outcome==='accepted')installed=true;installPrompt=null;render();
+        }catch(_){/* ignore */}
+      }else{track('install_ios_hint_shown');alert(t('install_ios_hint'));}
       return;
     }
 
-    if(btn.id==='playPause')return togglePlay();
-    if(btn.id==='prev'){const item=resolvePrevious(working,activeBreak?.id||engine.session?.originatingSetlistItemId,engine.session?.lastKnownOrder||[]);if(item)await playResolved(item);return;}
-    if(btn.id==='next'||btn.id==='playNext'){const item=resolveNext(working,activeBreak?.id||engine.session?.originatingSetlistItemId,engine.session?.lastKnownOrder||[]);if(item)await playResolved(item);return;}
-    if(btn.id==='rew')return engine.seek(-10);
-    if(btn.id==='fwd')return engine.seek(10);
+    if(btn.id==='playPause'){track('transport_play_pause');return togglePlay();}
+    if(btn.id==='prev'){track('transport_prev');const item=resolvePrevious(working,activeBreak?.id||engine.session?.originatingSetlistItemId,engine.session?.lastKnownOrder||[]);if(item)await playResolved(item);return;}
+    if(btn.id==='next'||btn.id==='playNext'){track('transport_next',{via:btn.id==='playNext'?'chip':'button'});const item=resolveNext(working,activeBreak?.id||engine.session?.originatingSetlistItemId,engine.session?.lastKnownOrder||[]);if(item)await playResolved(item);return;}
+    if(btn.id==='rew'){track('transport_rewind');return engine.seek(-10);}
+    if(btn.id==='fwd'){track('transport_forward');return engine.seek(10);}
 
-    if(btn.id==='transposeDown')return persistTranspose(-1);
-    if(btn.id==='transposeUp')return persistTranspose(1);
+    if(btn.id==='transposeDown'){track('transpose_change',{delta:-1});return persistTranspose(-1);}
+    if(btn.id==='transposeUp'){track('transpose_change',{delta:1});return persistTranspose(1);}
 
-    if(btn.id==='newSet'){newSetModalOpen=true;return render();}
+    if(btn.id==='newSet'){newSetModalOpen=true;track('new_setlist_open');return render();}
     if(btn.id==='cancelNewSet'){newSetModalOpen=false;return render();}
     if(btn.id==='confirmNewSet'){
       const name=document.querySelector('#newSetName')?.value.trim()||'New set list';
       if(isDirty(working,saved)&&!confirm(t('discard_confirm')))return;
-      working=newSetlist(name||t('default_new_set_name'));saved=null;newSetModalOpen=false;drawerOpen=true;return render();
+      working=newSetlist(name||t('default_new_set_name'));saved=null;newSetModalOpen=false;drawerOpen=true;
+      track('new_setlist_created');
+      return render();
     }
     if(btn.id==='saveSet'){
       working.updatedAt=new Date().toISOString();
@@ -609,26 +631,31 @@ app.addEventListener('click',async event=>{
       saved=clone(working);
       sets=[...sets.filter(s=>s.id!==working.id),clone(working)];
       setStatus(t('saved_set',{name:working.name}));
+      track('save_setlist',{tracks:working.items.filter(i=>i.type==='track').length,breaks:working.items.filter(i=>i.type==='break').length});
       return render();
     }
 
     if(btn.id==='addSong'){pendingInsertAfter=null;return pickSongAndAppend();}
-    if(btn.id==='addBreak'){addBreak(working);engine.updateLastKnownOrder(workingItemIds());return render();}
+    if(btn.id==='addBreak'){addBreak(working);engine.updateLastKnownOrder(workingItemIds());track('add_break');return render();}
 
     const editId=target.closest('[data-edit-song]')?.dataset.editSong;
-    if(editId)return openEditSheet(editId);
+    if(editId){track('open_edit_sheet');return openEditSheet(editId);}
 
     const removeId=target.closest('[data-remove]')?.dataset.remove;
-    if(removeId){removeItem(working,removeId);engine.updateLastKnownOrder(workingItemIds());return render();}
+    if(removeId){
+      const item=working.items.find(i=>i.id===removeId);
+      track('remove_item',{type:item?.type||'unknown'});
+      removeItem(working,removeId);engine.updateLastKnownOrder(workingItemIds());return render();
+    }
 
     if(btn.id==='closeSheet'||btn.id==='cancelSheet'){editSheet=null;return render();}
     if(btn.id==='saveSheet')return saveEditSheet();
-    if(btn.id==='importCifra'){document.querySelector('#cifraFile')?.click();return;}
-    if(btn.id==='importCifraClub'){openCifraClubSearch();return;}
+    if(btn.id==='importCifra'){track('import_cifra_file_click');document.querySelector('#cifraFile')?.click();return;}
+    if(btn.id==='importCifraClub'){track('cifraclub_open');openCifraClubSearch();return;}
     if(btn.id==='ccCancel'){cifraClubSearch=null;return render();}
     if(btn.id==='ccSearch'){await runCifraClubSearch();return;}
     const ccResult=target.closest('.cc-result[data-cc-url]');
-    if(ccResult){await pickCifraClubResult(ccResult.dataset.ccUrl);return;}
+    if(ccResult){track('cifraclub_pick_result');await pickCifraClubResult(ccResult.dataset.ccUrl);return;}
 
     if(btn.classList?.contains('chord-card')){
       // No behavior for now; kept as future hook (chord tap → jump / diagram detail)
@@ -641,57 +668,60 @@ app.addEventListener('click',async event=>{
 });
 
 app.addEventListener('change',async event=>{
-  const t=event.target;
+  const el=event.target;
   try{
-    if(t.id==='openSet'){
-      if(!t.value)return;
+    if(el.id==='openSet'){
+      if(!el.value)return;
       if(isDirty(working,saved)&&!confirm(t('discard_confirm')))return render();
-      const selected=sets.find(s=>s.id===t.value);
-      if(selected){working=clone(selected);saved=clone(selected);engine.updateLastKnownOrder(workingItemIds());render();}
+      const selected=sets.find(s=>s.id===el.value);
+      if(selected){working=clone(selected);saved=clone(selected);engine.updateLastKnownOrder(workingItemIds());track('open_setlist');render();}
       return;
     }
-    if(t.dataset.breakDur){
-      const item=working.items.find(i=>i.id===t.dataset.breakDur);
-      if(item){item.durationMinutes=Math.max(1,Math.min(240,Number(t.value)||15));render();}
+    if(el.dataset.breakDur){
+      const item=working.items.find(i=>i.id===el.dataset.breakDur);
+      if(item){item.durationMinutes=Math.max(1,Math.min(240,Number(el.value)||15));track('break_duration_edit',{minutes:item.durationMinutes});render();}
       return;
     }
-    if(t.id==='autoScroll'){
+    if(el.id==='autoScroll'){
       const song=activeSong();if(!song)return;
-      const updated=await saveScrollSettings(song.id,{enabled:t.checked,speed:song.cifraScrollSpeed});
+      const updated=await saveScrollSettings(song.id,{enabled:el.checked,speed:song.cifraScrollSpeed});
       songs=songs.map(s=>s.id===updated.id?updated:s);
+      track('auto_scroll_toggle',{enabled:el.checked});
       syncCifraAutoScroll();
       return;
     }
-    if(t.id==='scrollSpeed'){
+    if(el.id==='scrollSpeed'){
       const song=activeSong();if(!song)return;
-      const updated=await saveScrollSettings(song.id,{speed:Number(t.value),enabled:song.cifraAutoScrollEnabled});
+      const updated=await saveScrollSettings(song.id,{speed:Number(el.value),enabled:song.cifraAutoScrollEnabled});
       songs=songs.map(s=>s.id===updated.id?updated:s);
+      track('scroll_speed_change',{speed:Number(el.value)});
       return;
     }
-    if(t.id==='cifraFile'){
-      const file=t.files?.[0];if(!file||!editSheet)return;
+    if(el.id==='cifraFile'){
+      const file=el.files?.[0];if(!file||!editSheet)return;
       const text=await file.text();
       editSheet.cifra=text;
       const editor=document.querySelector('#editCifra');
       if(editor)editor.value=text;
+      track('cifra_file_imported',{bytes:file.size});
       return;
     }
   }catch(error){setStatus(error.message||t('change_failed'),true);render();}
 });
 
 app.addEventListener('input',event=>{
-  const t=event.target;
-  if(t.id==='scrollSpeed'){
-    const v=Number(t.value);
-    const out=t.parentElement.querySelector('output');
+  const el=event.target;
+  if(el.id==='scrollSpeed'){
+    const v=Number(el.value);
+    const out=el.parentElement.querySelector('output');
     if(out)out.textContent=`${v.toFixed(2)}×`;
     const song=activeSong();
     if(song){song.cifraScrollSpeed=v;}
     return;
   }
-  if(t.id==='editTitle'){editSheet.title=t.value;return;}
-  if(t.id==='editArtist'){editSheet.artist=t.value;return;}
-  if(t.id==='editCifra'){editSheet.cifra=t.value;return;}
+  if(el.id==='editTitle'){editSheet.title=el.value;return;}
+  if(el.id==='editArtist'){editSheet.artist=el.value;return;}
+  if(el.id==='editCifra'){editSheet.cifra=el.value;return;}
 });
 
 // Drag & drop reorder within the drawer
@@ -714,6 +744,7 @@ app.addEventListener('drop',event=>{
   moveItem(working,dragId,targetIndex);
   dragId=null;
   engine.updateLastKnownOrder(workingItemIds());
+  track('reorder_item');
   render();
 });
 
@@ -758,11 +789,13 @@ window.addEventListener('beforeunload',event=>{
 window.addEventListener('beforeinstallprompt',event=>{
   event.preventDefault();
   installPrompt=event;
+  track('install_prompt_available');
   render();
 });
 window.addEventListener('appinstalled',()=>{
   installed=true;
   installPrompt=null;
+  track('app_installed');
   render();
 });
 
@@ -814,6 +847,7 @@ async function boot(){
   }catch(error){
     storageError=error;
   }
+  trackBoot({language:getLanguage(),songs:songs.length,setlists:sets.length,online:navigator.onLine});
   render();
   if('serviceWorker'in navigator){
     try{
