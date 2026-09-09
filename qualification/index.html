@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080912">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./qualification.css">
+  <title>LiveSet iPad WebGPU Qualification</title>
+</head>
+<body>
+  <main>
+    <img src="../logo.png" alt="LiveSet 1">
+    <h1>iPad WebGPU Qualification</h1>
+    <p>This isolated test loads the approved HT-Demucs derivative using WebGPU only, then runs one real 7.8-second inference.</p>
+    <div class="warning">The model is 285 MB and inference is memory-intensive. Keep this page in the foreground until it finishes.</div>
+    <button id="run" type="button">RUN QUALIFICATION</button>
+    <button id="copy" type="button" disabled>COPY RESULTS</button>
+    <p id="status" role="status">Ready. Tap Run Qualification.</p>
+    <progress id="progress" max="100" value="0"></progress>
+    <pre id="result" aria-label="Qualification results"></pre>
+  </main>
+  <script type="module" src="./qualification.js"></script>
+</body>
+</html>

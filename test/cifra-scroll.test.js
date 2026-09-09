@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {advanceCifraScroll} from '../src/cifra-scroll.js';
+test('low auto-scroll speeds accumulate sub-pixel movement',()=>{let position=0;for(let frame=0;frame<60;frame++)position=advanceCifraScroll(position,1000/60,0.25);assert.ok(position>4&&position<5);assert.ok(advanceCifraScroll(position,1000/60,0.25)>position);});
+test('auto-scroll progression remains proportional across slider speeds',()=>{const slow=advanceCifraScroll(0,100,1),fast=advanceCifraScroll(0,100,1.75);assert.ok(slow>0);assert.equal(Number((fast/slow).toFixed(2)),1.75);});

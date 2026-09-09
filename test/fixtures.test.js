@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {wavFixture} from './fixtures.mjs';
+test('deterministic WAV fixture has valid RIFF/WAVE headers and stable bytes',()=>{const a=wavFixture(),b=wavFixture();assert.equal(Buffer.from(a).toString('hex'),Buffer.from(b).toString('hex'));assert.equal(Buffer.from(a).subarray(0,4).toString(),'RIFF');assert.equal(Buffer.from(a).subarray(8,12).toString(),'WAVE');});
