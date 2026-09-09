@@ -1,4 +1,4 @@
-const CACHE='liveset-shell-v48';
+const CACHE='liveset-shell-v49';
 const SHELL=[
   './',
   './index.html',
@@ -13,6 +13,7 @@ const SHELL=[
   './src/setlist.js',
   './src/storage.js',
   './src/song-service.js',
+  './src/id3.js',
   './src/cifra.js',
   './src/cifra-scroll.js',
   './src/chords.js',

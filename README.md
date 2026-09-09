@@ -25,6 +25,7 @@ There are no build steps and no runtime dependencies. It is a static site.
 ## What it does
 
 - **Pick a song from your device** — no import ceremony. On Android and desktop Chrome the app remembers the file across launches (File System Access API). On iPad/iPhone Safari the audio is silently copied into browser storage.
+- **Import and edit MP3 tags** — title, artist, and embedded `USLT` lyrics are read automatically. Saving a song writes those edits back to the original MP3 on Chromium, or to LiveSet's local copy on Safari.
 - **Build a set list** — songs and breaks, drag to reorder, save when you want.
 - **Play through the set list** — full transport (prev / rewind / play·pause / forward / next), space bar toggles play.
 - **Edit any song's lyrics + chords** from the setlist row. Import `.txt` or `.cho`. Cifra edits, transpose, and scroll speed save immediately per song — even if you never save the set list itself.

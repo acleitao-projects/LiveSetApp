@@ -121,6 +121,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-
 .sheet .field label{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .cifra-import-actions{display:inline-flex;gap:8px;flex-wrap:wrap}
 .cifra-import-actions .btn.small{text-transform:none;letter-spacing:0}
+.mp3-save-hint{margin:0;color:var(--muted);font-size:12px;line-height:1.45}
 
 .cc-modal{width:min(560px,100%)}
 .cc-results{margin-top:16px;display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow-y:auto;padding-right:4px}

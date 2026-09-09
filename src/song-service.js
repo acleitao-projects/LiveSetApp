@@ -1,5 +1,6 @@
 import {newSong} from './models.js';
 import {repository,storageCapabilities,writeOpfsFile,readOpfsFile,removeOpfsPath} from './storage.js';
+import {isMp3File,readMp3Metadata,rewriteMp3Metadata} from './id3.js';
 
 const AUDIO_ACCEPT='.mp3,.m4a,.aac,.wav,.flac,.ogg,.oga,.opus,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/flac,audio/ogg,audio/*';
 
@@ -27,6 +28,11 @@ async function dedupeMatch(filename,size){
 }
 
 function titleFromFilename(name){return String(name||'').replace(/\.[^.]+$/,'')||'Untitled';}
+
+async function importedMetadata(file){
+  if(!isMp3File(file))return {title:'',artist:'',lyrics:''};
+  try{return await readMp3Metadata(file);}catch(_){return {title:'',artist:'',lyrics:''};}
+}
 
 async function copyToOpfs(file,songId){
   const ext=file.name.includes('.')?file.name.slice(file.name.lastIndexOf('.')):'.audio';
@@ -60,8 +66,11 @@ async function pickViaHandle(){
     return existing;
   }
   const probed=await probe(file);
+  const metadata=await importedMetadata(file);
   const song=newSong({
-    title:titleFromFilename(file.name),
+    title:metadata.title||titleFromFilename(file.name),
+    artist:metadata.artist,
+    cifraSource:metadata.lyrics,
     originalFilename:file.name,
     originalSize:file.size,
     durationSeconds:probed.durationSeconds,
@@ -75,8 +84,11 @@ export async function registerFromInputFile(file){
   const existing=await dedupeMatch(file.name,file.size);
   if(existing)return existing;
   const probed=await probe(file);
+  const metadata=await importedMetadata(file);
   const song=newSong({
-    title:titleFromFilename(file.name),
+    title:metadata.title||titleFromFilename(file.name),
+    artist:metadata.artist,
+    cifraSource:metadata.lyrics,
     originalFilename:file.name,
     originalSize:file.size,
     durationSeconds:probed.durationSeconds,
@@ -114,6 +126,14 @@ async function ensureHandlePermission(handle){
   return request==='granted';
 }
 
+async function ensureHandleWritePermission(handle){
+  if(!handle?.queryPermission)return true;
+  const query=await handle.queryPermission({mode:'readwrite'});
+  if(query==='granted')return true;
+  const request=await handle.requestPermission({mode:'readwrite'});
+  return request==='granted';
+}
+
 export async function songUrl(song){
   if(!song?.source)throw Error('Song has no audio source.');
   if(song.source.kind==='handle'){
@@ -147,6 +167,37 @@ async function updateSong(id,mutator){
 
 export function saveCifra(id,cifraSource){return updateSong(id,song=>{song.cifraSource=String(cifraSource||'');});}
 export function saveMetadata(id,{title,artist}){return updateSong(id,song=>{if(title!=null)song.title=String(title);if(artist!=null)song.artist=String(artist);});}
+export async function saveSongEdits(id,{title,artist,cifra},sourceHint=null){
+  let hintedWritePermission=null;
+  if(isMp3File(sourceHint)&&sourceHint?.source?.kind==='handle'){
+    hintedWritePermission=await ensureHandleWritePermission(sourceHint.source.handle);
+    if(!hintedWritePermission)throw Error('Permission to update this MP3 file was not granted.');
+  }
+  const stored=await repository.songs.get(id);
+  if(!stored)throw Error('Song not found.');
+  const updated={...stored,title:String(title??stored.title),artist:String(artist??stored.artist),cifraSource:String(cifra??stored.cifraSource),updatedAt:new Date().toISOString()};
+  let metadataWritten=false;
+  if(isMp3File(stored)){
+    let file;
+    if(stored.source?.kind==='handle'){
+      if(hintedWritePermission!==true&&!await ensureHandleWritePermission(stored.source.handle))throw Error('Permission to update this MP3 file was not granted.');
+      file=await stored.source.handle.getFile();
+      const rewritten=await rewriteMp3Metadata(file,{title:updated.title,artist:updated.artist,lyrics:updated.cifraSource});
+      const writable=await stored.source.handle.createWritable();
+      try{await writable.write(rewritten);await writable.close();}catch(error){await writable.abort?.().catch(()=>{});throw error;}
+      updated.originalSize=rewritten.size;
+      metadataWritten=true;
+    }else if(stored.source?.kind==='opfs'){
+      file=await readOpfsFile(stored.source.path);
+      const rewritten=await rewriteMp3Metadata(file,{title:updated.title,artist:updated.artist,lyrics:updated.cifraSource});
+      await writeOpfsFile(stored.source.path,rewritten);
+      updated.originalSize=rewritten.size;
+      metadataWritten=true;
+    }
+  }
+  await repository.songs.put(updated);
+  return {song:updated,metadataWritten};
+}
 export function saveTranspose(id,semitones){return updateSong(id,song=>{song.transposeSemitones=Math.max(-12,Math.min(12,Math.round(Number(semitones)||0)));});}
 export function saveScrollSettings(id,{speed,enabled}){return updateSong(id,song=>{if(speed!=null)song.cifraScrollSpeed=Math.max(0,Math.min(5,Number(speed)||0));if(enabled!=null)song.cifraAutoScrollEnabled=!!enabled;});}
 

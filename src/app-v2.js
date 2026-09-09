@@ -2,7 +2,7 @@ import {repository,storageCapabilities,storageEstimate} from './storage.js';
 import {newSetlist,trackItem,breakItem} from './models.js';
 import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js';
 import {AudioEngine} from './audio.js';
-import {pickAndRegisterSong,registerFromInputFile,songUrl,listSongs,saveCifra,saveMetadata,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js';
+import {pickAndRegisterSong,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js';
 import {parseCifra} from './cifra.js';
 import {chordDiagramSvg} from './chords.js';
 import {advanceCifraScroll} from './cifra-scroll.js';
@@ -261,6 +261,7 @@ function renderBreakRow(item){
 function renderEditSheet(){
   const song=songById(editSheet.songId);
   if(!song)return '';
+  const mp3SaveHint=/\.mp3$/i.test(song.originalFilename||'')?t(song.source?.kind==='handle'?'mp3_save_hint_original':'mp3_save_hint_copy'):'';
   return `<div class="sheet-scrim" id="sheetScrim"></div>
   <aside class="sheet">
     <div class="sheet-head">
@@ -279,6 +280,7 @@ function renderEditSheet(){
         </label>
         <textarea id="editCifra" class="cifra-editor" placeholder="[Intro]&#10;Am   F   C   G&#10;&#10;[Verse]&#10;...">${esc(editSheet.cifra)}</textarea>
       </div>
+      ${mp3SaveHint?`<p class="mp3-save-hint">${esc(mp3SaveHint)}</p>`:''}
     </div>
     <div class="sheet-actions">
       <button class="btn" id="cancelSheet">${esc(t('cancel'))}</button>
@@ -535,11 +537,11 @@ async function saveEditSheet(){
   if(!editSheet)return;
   const {songId,title,artist,cifra}=editSheet;
   try{
-    let updated=await saveMetadata(songId,{title,artist});
-    updated=await saveCifra(songId,cifra);
+    const result=await saveSongEdits(songId,{title,artist,cifra},songById(songId));
+    const updated=result.song;
     songs=songs.map(s=>s.id===updated.id?updated:s);
     editSheet=null;
-    setStatus(t('song_saved'));
+    setStatus(t(result.metadataWritten?'song_mp3_saved':'song_saved'));
     render();
   }catch(error){
     setStatus(error.message||t('save_failed'),true);
@@ -815,7 +817,7 @@ async function boot(){
   render();
   if('serviceWorker'in navigator){
     try{
-      const registration=await navigator.serviceWorker.register('./sw.js?v=12');
+      const registration=await navigator.serviceWorker.register('./sw.js?v=13');
       if(registration.waiting)updateAvailable=true;
       registration.addEventListener('updatefound',()=>{
         const worker=registration.installing;
