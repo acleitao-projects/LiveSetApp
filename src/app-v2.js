@@ -1,20 +1,22 @@
 // Query string on each import busts browser + service-worker cache when we push
 // changes. Bump BUILD when any of these files change together, or bump the file's
 // own suffix if only one changed.
-const BUILD='30';
-import {repository,storageCapabilities,storageEstimate} from './storage.js?v=30';
-import {newSetlist,trackItem,breakItem} from './models.js?v=30';
-import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=30';
-import {AudioEngine} from './audio.js?v=30';
-import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=30';
-import {parseCifra} from './cifra.js?v=30';
-import {chordDiagramSvg} from './chords.js?v=30';
-import {advanceCifraScroll} from './cifra-scroll.js?v=30';
-import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=30';
-import {icon} from './icons.js?v=30';
-import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=30';
-import {searchCifraClub,fetchCifraFromUrl} from './cifraclub-import.js?v=30';
-import {track,trackBoot,trackView} from './analytics.js?v=30';
+const BUILD='33';
+import {repository,storageCapabilities,storageEstimate} from './storage.js?v=33';
+import {newSetlist,trackItem,breakItem,uid} from './models.js?v=33';
+import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=33';
+import {AudioEngine} from './audio.js?v=33';
+import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=33';
+import {parseCifra} from './cifra.js?v=33';
+import {chordDiagramSvg} from './chords.js?v=33';
+import {advanceCifraScroll} from './cifra-scroll.js?v=33';
+import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=33';
+import {icon} from './icons.js?v=33';
+import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=33';
+import {searchCifraClub,fetchCifraFromUrl} from './cifraclub-import.js?v=33';
+import {track,trackBoot,trackView} from './analytics.js?v=33';
+import {loadSettings,saveSetting,clampFontScale} from './settings-service.js?v=33';
+import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=33';
 
 const app=document.querySelector('#app');
 const engine=new AudioEngine();
@@ -41,6 +43,12 @@ let lastRenderedSongId=null;
 let installPrompt=null;
 let installed=false;
 let cifraClubSearch=null; // {artist, query, loading, results, error}
+let settingsSheetOpen=false;
+let onboardingStep=null; // null | 0..3
+let fontScale=1.0;
+let wakeLockSentinel=null;
+let backupInputEl=null;
+let shareInputEl=null;
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtTime=s=>Number.isFinite(s)?`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`:'0:00';
@@ -49,6 +57,25 @@ const songById=id=>songs.find(s=>s.id===id);
 const workingItemIds=()=>working.items.map(i=>i.id);
 
 let statusTimer=0;
+// ---------- Wake lock ----------
+async function acquireWakeLock(){
+  if(!('wakeLock'in navigator))return;
+  if(wakeLockSentinel)return;
+  try{
+    wakeLockSentinel=await navigator.wakeLock.request('screen');
+    wakeLockSentinel.addEventListener('release',()=>{wakeLockSentinel=null;});
+  }catch(_){/* denied or unsupported — silent */}
+}
+async function releaseWakeLock(){
+  if(!wakeLockSentinel)return;
+  try{await wakeLockSentinel.release();}catch(_){}
+  wakeLockSentinel=null;
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&engine.session&&!engine.paused)acquireWakeLock();
+  else if(document.visibilityState!=='visible')releaseWakeLock();
+});
+
 function setStatus(msg,error=false){
   statusMessage=msg;statusError=!!error;
   clearTimeout(statusTimer);
@@ -89,6 +116,8 @@ function render(){
     ${editSheet?renderEditSheet():''}
     ${cifraClubSearch?renderCifraClubModal():''}
     ${newSetModalOpen?renderNewSetModal():''}
+    ${settingsSheetOpen?renderSettingsSheet():''}
+    ${onboardingStep!==null?renderOnboarding():''}
     ${storageError?`<div class="notice" role="status">${esc(t('storage_unavailable'))}</div>`:''}
     ${updateAvailable?`<button class="btn small" id="applyUpdate" style="position:fixed;bottom:14px;left:14px;z-index:5">${esc(t('update_ready'))}</button>`:''}
     ${statusMessage?`<div class="notice" role="status" style="position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:5;max-width:min(520px,90vw);text-align:center">${statusError?'⚠ ':''}${esc(statusMessage)}</div>`:''}
@@ -111,9 +140,10 @@ function renderSongHeader(song,nextSong,nextItem){
   if(activeBreak){
     return `<div class="song-header"><div class="title"><h1>${esc(activeBreak.label||t('break'))}</h1><div class="artist">${activeBreak.durationMinutes} ${t('min')} · ${t('break_continue')}</div></div></div>`;
   }
+  const hasNotes=!!(song?.notes&&song.notes.trim());
   return `<div class="song-header">
     <div class="title">
-      <h1>${esc(song?.title||t('ready'))}</h1>
+      <h1>${esc(song?.title||t('ready'))}${hasNotes?`<button class="notes-badge" id="showNotes" aria-label="${esc(t('song_notes'))}" title="${esc(song.notes)}">${icon('note')||'★'}</button>`:''}</h1>
       ${song?.artist?`<div class="artist">${esc(song.artist)}</div>`:song?`<div class="artist">${esc(song.originalFilename||'')}</div>`:`<div class="artist">${esc(t('open_set_list_hint'))}</div>`}
     </div>
     ${nextSong||nextItem?.type==='break'?`<button class="next-chip" id="playNext"><span class="label">${esc(t('next'))}</span><strong>${esc(nextSong?nextSong.title:(nextItem?.label||t('break')))}</strong>${icon('chevronRight')}</button>`:''}
@@ -235,11 +265,19 @@ function renderDrawer(){
       <button class="btn" id="addSong">${icon('plus')}${esc(t('add_song'))}</button>
       <button class="btn" id="addBreak">${icon('coffee')}${esc(t('add_break'))}</button>
     </div>
+    <div class="drawer-actions secondary">
+      <button class="btn small" id="duplicateSet" title="${esc(t('duplicate_setlist'))}">${icon('copy')}${esc(t('duplicate'))}</button>
+      <button class="btn small" id="shareSet" title="${esc(t('share_setlist'))}">${icon('share')}${esc(t('share'))}</button>
+      <button class="btn small" id="importShare" title="${esc(t('import_setlist_share'))}">${icon('upload')}${esc(t('import_share'))}</button>
+    </div>
     <div class="drawer-foot">
       <div class="lang-toggle" role="group" aria-label="${esc(t('language'))}">
         ${supportedLanguages().map(code=>`<button class="lang-chip ${code===lang?'active':''}" data-lang="${code}">${code.toUpperCase()}</button>`).join('')}
       </div>
-      ${showInstall?`<button class="btn small install-btn" id="installApp">${icon('save')}${esc(t('install'))}</button>`:''}
+      <div class="drawer-foot-actions">
+        <button class="btn icon ghost" id="openSettings" aria-label="${esc(t('settings'))}" title="${esc(t('settings'))}">${icon('gear')}</button>
+        ${showInstall?`<button class="btn small install-btn" id="installApp">${icon('save')}${esc(t('install'))}</button>`:''}
+      </div>
     </div>
   </aside>`;
 }
@@ -284,6 +322,7 @@ function renderEditSheet(){
     <div class="sheet-body">
       <div class="field"><label for="editTitle">${esc(t('title'))}</label><input id="editTitle" value="${esc(editSheet.title)}"></div>
       <div class="field"><label for="editArtist">${esc(t('artist'))}</label><input id="editArtist" value="${esc(editSheet.artist)}"></div>
+      <div class="field"><label for="editNotes">${esc(t('notes'))}</label><textarea id="editNotes" rows="2" placeholder="${esc(t('notes_placeholder'))}">${esc(editSheet.notes||'')}</textarea></div>
       <div class="field" style="flex:1;min-height:280px">
         <label for="editCifra">${esc(t('cifra'))}
           <span class="cifra-import-actions">
@@ -301,6 +340,60 @@ function renderEditSheet(){
     </div>
     <input type="file" id="cifraFile" accept=".txt,.cho,.crd,.chopro,text/plain" hidden>
   </aside>`;
+}
+
+function renderOnboarding(){
+  const step=onboardingStep;
+  const steps=[
+    {title:t('onboard_welcome_title'),body:t('onboard_welcome_body'),icon:'music'},
+    {title:t('onboard_add_title'),body:t('onboard_add_body'),icon:'plus'},
+    {title:t('onboard_edit_title'),body:t('onboard_edit_body'),icon:'edit'},
+    {title:t('onboard_play_title'),body:t('onboard_play_body'),icon:'play'}
+  ];
+  const s=steps[step]||steps[0];
+  const isLast=step>=steps.length-1;
+  return `<div class="modal-scrim">
+    <div class="modal onboarding-modal" role="dialog" aria-modal="true">
+      <div class="onboarding-icon">${icon(s.icon)}</div>
+      <h2>${esc(s.title)}</h2>
+      <p class="muted">${esc(s.body)}</p>
+      <div class="onboarding-dots">${steps.map((_,i)=>`<span class="dot ${i===step?'active':''}"></span>`).join('')}</div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="onboardingSkip">${esc(t('skip'))}</button>
+        <div style="flex:1"></div>
+        ${step>0?`<button class="btn" id="onboardingBack">${esc(t('back'))}</button>`:''}
+        <button class="btn primary" id="onboardingNext">${esc(isLast?t('get_started'):t('next_step'))}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderSettingsSheet(){
+  const scalePct=Math.round(fontScale*100);
+  return `<div class="modal-scrim" id="settingsScrim">
+    <div class="modal cc-modal" role="dialog" aria-modal="true">
+      <h2>${esc(t('settings'))}</h2>
+      <div class="field">
+        <label>${esc(t('font_size'))} <span class="muted">${scalePct}%</span></label>
+        <div class="font-scale-row">
+          <button class="btn" id="fontScaleDown" aria-label="${esc(t('font_smaller'))}">A−</button>
+          <div class="font-scale-preview" style="font-size:${(fontScale*17).toFixed(2)}px">Am  F  C  G</div>
+          <button class="btn" id="fontScaleUp" aria-label="${esc(t('font_larger'))}">A+</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>${esc(t('backup_section'))}</label>
+        <div class="settings-btn-row">
+          <button class="btn" id="backupExport">${icon('download')}${esc(t('backup_export'))}</button>
+          <button class="btn" id="backupImport">${icon('upload')}${esc(t('backup_import'))}</button>
+        </div>
+        <p class="muted" style="margin:6px 0 0;font-size:12px;line-height:1.4">${esc(t('backup_hint'))}</p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn primary" id="closeSettings">${esc(t('done'))}</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 function renderCifraClubModal(){
@@ -488,7 +581,7 @@ async function reloadSongs(){
 function openEditSheet(songId){
   const song=songById(songId);
   if(!song)return;
-  editSheet={songId,title:song.title,artist:song.artist||'',cifra:song.cifraSource||''};
+  editSheet={songId,title:song.title,artist:song.artist||'',cifra:song.cifraSource||'',notes:song.notes||''};
   render();
 }
 
@@ -514,6 +607,123 @@ function openCifraClubSearch(){
     results:[],
     error:''
   };
+  render();
+}
+
+function applyFontScale(){
+  document.documentElement.style.setProperty('--cifra-scale',String(fontScale));
+}
+
+async function adjustFontScale(delta){
+  fontScale=clampFontScale(fontScale+delta);
+  applyFontScale();
+  await saveSetting('fontScale',fontScale);
+  track('font_scale_change',{scale:fontScale});
+}
+
+async function runDuplicateSet(){
+  const copy=clone(working);
+  copy.id=uid();
+  copy.name=`${working.name} — ${t('copy_suffix')}`;
+  copy.items=copy.items.map(item=>({...item,id:uid()}));
+  copy.createdAt=copy.updatedAt=new Date().toISOString();
+  await repository.setlists.put(copy);
+  sets=[...sets.filter(s=>s.id!==copy.id),clone(copy)];
+  working=clone(copy);saved=clone(copy);
+  engine.updateLastKnownOrder(workingItemIds());
+  setStatus(t('setlist_duplicated',{name:copy.name}));
+  track('duplicate_setlist');
+  render();
+}
+
+function downloadBlob(blob,filename){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+
+async function runShareSet(){
+  try{
+    const share=shareSetlist(working,songs);
+    const filename=`${(working.name||'setlist').replace(/[^\w-]+/g,'_')}.setlist.json`;
+    downloadBlob(setlistBlob(share),filename);
+    setStatus(t('setlist_shared'));track('share_setlist',{tracks:share.songs.length});
+  }catch(error){setStatus(error.message||t('share_failed'),true);render();}
+}
+
+function triggerShareImport(){
+  if(!shareInputEl){
+    shareInputEl=document.createElement('input');
+    shareInputEl.type='file';shareInputEl.accept='.json,application/json';
+    shareInputEl.style.display='none';
+    shareInputEl.addEventListener('change',handleShareImport);
+    document.body.appendChild(shareInputEl);
+  }
+  shareInputEl.value='';shareInputEl.click();
+}
+async function handleShareImport(){
+  const file=shareInputEl.files?.[0];if(!file)return;
+  try{
+    const text=await file.text();
+    const share=JSON.parse(text);
+    const {setlist,imported}=await importSetlistShare(share);
+    if(isDirty(working,saved)&&!confirm(t('discard_confirm')))return;
+    setlist.id=uid();setlist.items=setlist.items.map(i=>({...i,id:uid()}));
+    setlist.createdAt=setlist.updatedAt=new Date().toISOString();
+    await repository.setlists.put(setlist);
+    sets=await repository.setlists.all();
+    songs=await listSongs();
+    working=clone(setlist);saved=clone(setlist);
+    setStatus(t('share_imported',{count:imported}));
+    track('import_share',{songs:imported});
+    render();
+  }catch(error){setStatus(error?.message==='invalid_setlist_share'?t('share_invalid'):(error.message||t('share_failed')),true);render();}
+}
+
+async function runBackupExport(){
+  try{
+    setStatus(t('backup_working'));render();
+    const backup=await createBackup();
+    const stamp=new Date().toISOString().replace(/[:.]/g,'-').replace(/T/,'_').slice(0,19);
+    downloadBlob(backupBlob(backup),`liveset-backup-${stamp}.json`);
+    setStatus(t('backup_saved'));
+    track('backup_export',{songs:backup.songs.length,setlists:backup.setlists.length,files:Object.keys(backup.files).length});
+  }catch(error){setStatus(error.message||t('backup_failed'),true);render();}
+}
+
+function triggerBackupImport(){
+  if(!backupInputEl){
+    backupInputEl=document.createElement('input');
+    backupInputEl.type='file';backupInputEl.accept='.json,application/json';
+    backupInputEl.style.display='none';
+    backupInputEl.addEventListener('change',handleBackupImport);
+    document.body.appendChild(backupInputEl);
+  }
+  backupInputEl.value='';backupInputEl.click();
+}
+async function handleBackupImport(){
+  const file=backupInputEl.files?.[0];if(!file)return;
+  try{
+    const text=await file.text();
+    const backup=JSON.parse(text);
+    if(!confirm(t('backup_restore_confirm')))return;
+    setStatus(t('backup_restoring'));render();
+    const summary=await restoreBackup(backup,{mode:'merge'});
+    songs=await listSongs();sets=await repository.setlists.all();
+    const restoredSettings=await loadSettings();
+    fontScale=restoredSettings.fontScale;applyFontScale();
+    if(sets[0]){saved=clone(sets[0]);working=clone(sets[0]);}
+    setStatus(t('backup_restored',{songs:summary.songs,setlists:summary.setlists,files:summary.files}));
+    track('backup_import',{songs:summary.songs,setlists:summary.setlists,files:summary.files});
+    render();
+  }catch(error){setStatus(error?.message==='invalid_backup'?t('backup_invalid'):(error.message||t('backup_failed')),true);render();}
+}
+
+async function finishOnboarding(skipped){
+  onboardingStep=null;
+  await saveSetting('onboardingCompleted',true);
+  track(skipped?'onboarding_skipped':'onboarding_completed');
   render();
 }
 
@@ -563,7 +773,7 @@ async function saveEditSheet(){
   if(!editSheet)return;
   const {songId,title,artist,cifra}=editSheet;
   try{
-    const result=await saveSongEdits(songId,{title,artist,cifra},songById(songId));
+    const result=await saveSongEdits(songId,{title,artist,cifra,notes:editSheet.notes},songById(songId));
     const updated=result.song;
     songs=songs.map(s=>s.id===updated.id?updated:s);
     editSheet=null;
@@ -586,6 +796,7 @@ app.addEventListener('click',async event=>{
   if(target.id==='sheetScrim'){editSheet=null;return render();}
   if(target.id==='newSetScrim'){newSetModalOpen=false;return render();}
   if(target.id==='ccScrim'){cifraClubSearch=null;return render();}
+  if(target.id==='settingsScrim'){settingsSheetOpen=false;return render();}
 
   // Language chip
   const langBtn=target.closest('.lang-chip[data-lang]');
@@ -601,6 +812,18 @@ app.addEventListener('click',async event=>{
   }
 
   try{
+    if(btn.id==='openSettings'){settingsSheetOpen=true;track('open_settings');return render();}
+    if(btn.id==='closeSettings'){settingsSheetOpen=false;return render();}
+    if(btn.id==='fontScaleUp'){await adjustFontScale(0.1);return render();}
+    if(btn.id==='fontScaleDown'){await adjustFontScale(-0.1);return render();}
+    if(btn.id==='backupExport'){await runBackupExport();return;}
+    if(btn.id==='backupImport'){triggerBackupImport();return;}
+    if(btn.id==='duplicateSet'){await runDuplicateSet();return;}
+    if(btn.id==='shareSet'){await runShareSet();return;}
+    if(btn.id==='importShare'){triggerShareImport();return;}
+    if(btn.id==='onboardingSkip'){await finishOnboarding(true);return render();}
+    if(btn.id==='onboardingNext'){onboardingStep=(onboardingStep??0)+1;if(onboardingStep>3)await finishOnboarding(false);return render();}
+    if(btn.id==='onboardingBack'){onboardingStep=Math.max(0,(onboardingStep??0)-1);return render();}
     if(btn.id==='openDrawer'){drawerOpen=true;track('open_drawer');return render();}
     if(btn.id==='closeDrawer'){drawerOpen=false;return render();}
     if(btn.id==='fullscreenToggle'){fullscreen=true;track('fullscreen_toggle',{enabled:true});return render();}
@@ -619,6 +842,7 @@ app.addEventListener('click',async event=>{
       return;
     }
 
+    if(btn.id==='showNotes'){const s=activeSong();if(s?.notes){track('view_song_notes');alert(s.notes);}return;}
     if(btn.id==='playPause'){track('transport_play_pause');return togglePlay();}
     if(btn.id==='prev'){track('transport_prev');const item=resolvePrevious(working,activeBreak?.id||engine.session?.originatingSetlistItemId,engine.session?.lastKnownOrder||[]);if(item)await playResolved(item);return;}
     if(btn.id==='next'||btn.id==='playNext'){track('transport_next',{via:btn.id==='playNext'?'chip':'button'});const item=resolveNext(working,activeBreak?.id||engine.session?.originatingSetlistItemId,engine.session?.lastKnownOrder||[]);if(item)await playResolved(item);return;}
@@ -733,6 +957,7 @@ app.addEventListener('input',event=>{
   }
   if(el.id==='editTitle'){editSheet.title=el.value;return;}
   if(el.id==='editArtist'){editSheet.artist=el.value;return;}
+  if(el.id==='editNotes'){editSheet.notes=el.value;return;}
   if(el.id==='editCifra'){editSheet.cifra=el.value;return;}
 });
 
@@ -782,6 +1007,8 @@ document.addEventListener('keydown',event=>{
     togglePlay();
   }
   if(event.key==='Escape'){
+    if(onboardingStep!==null)return; // onboarding is intentional; use Skip
+    if(settingsSheetOpen){settingsSheetOpen=false;return render();}
     if(cifraClubSearch){cifraClubSearch=null;return render();}
     if(editSheet){editSheet=null;return render();}
     if(newSetModalOpen){newSetModalOpen=false;return render();}
@@ -814,6 +1041,7 @@ window.addEventListener('appinstalled',()=>{
 // Engine reactive updates — minimal DOM patch to avoid flicker
 engine.addEventListener('state',()=>{
   const paused=engine.paused||!engine.session;
+  if(paused)releaseWakeLock(); else acquireWakeLock();
   const time=document.querySelector('.control-strip .time');
   const bar=document.querySelector('.control-strip .bar i');
   if(time)time.textContent=`${fmtTime(engine.currentTime)} / ${fmtTime(engine.duration)}`;
@@ -843,6 +1071,10 @@ async function boot(){
     const caps=storageCapabilities();
     if(!caps.indexedDB)throw Error(t('indexeddb_required'));
     await loadLanguage();
+    const settings=await loadSettings();
+    fontScale=clampFontScale(settings.fontScale);
+    applyFontScale();
+    if(!settings.onboardingCompleted)onboardingStep=0;
     songs=await listSongs();
     sets=await repository.setlists.all();
     if(!sets.length){

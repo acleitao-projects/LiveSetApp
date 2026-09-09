@@ -93,6 +93,9 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-
 .drawer-actions .btn{flex:1}
 
 .drawer-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-top:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
+.drawer-foot-actions{display:inline-flex;align-items:center;gap:8px}
+.drawer-actions.secondary{padding:8px 14px 12px;border-top:0;background:transparent;gap:8px}
+.drawer-actions.secondary .btn{min-height:40px;font-size:13px}
 .lang-toggle{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:99px;padding:3px;gap:0}
 .lang-chip{padding:6px 12px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted);transition:background 120ms,color 120ms}
 .lang-chip.active{background:var(--accent);color:#1A1000}
@@ -124,6 +127,29 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-
 .mp3-save-hint{margin:0;color:var(--muted);font-size:12px;line-height:1.45}
 
 .cc-modal{width:min(560px,100%)}
+
+/* Settings sheet */
+.font-scale-row{display:flex;align-items:center;gap:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:10px 14px}
+.font-scale-row .btn{min-height:44px;width:52px;padding:0;font-weight:800}
+.font-scale-preview{flex:1;text-align:center;font-family:var(--mono);color:var(--accent);font-weight:700;transition:font-size 120ms}
+.settings-btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.settings-btn-row .btn{flex:1;min-width:140px;justify-content:flex-start}
+
+/* Notes badge on the song title */
+.notes-badge{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;margin-left:10px;border-radius:8px;background:var(--surface-2);border:1px solid var(--accent);color:var(--accent);vertical-align:middle}
+.notes-badge:hover{background:rgba(245,165,36,.14)}
+.notes-badge .ic{width:18px;height:18px}
+
+/* Onboarding */
+.onboarding-modal{text-align:center;width:min(440px,100%)}
+.onboarding-icon{display:flex;align-items:center;justify-content:center;width:64px;height:64px;margin:0 auto 12px;background:rgba(245,165,36,.14);border-radius:16px;color:var(--accent)}
+.onboarding-icon .ic{width:36px;height:36px}
+.onboarding-modal h2{margin-top:0}
+.onboarding-modal p.muted{margin:0 0 22px;font-size:15px;line-height:1.55}
+.onboarding-dots{display:flex;justify-content:center;gap:6px;margin:8px 0 4px}
+.onboarding-dots .dot{width:8px;height:8px;border-radius:99px;background:var(--border);transition:background 120ms,width 120ms}
+.onboarding-dots .dot.active{background:var(--accent);width:20px}
+.onboarding-modal .modal-actions{gap:8px}
 .cc-results{margin-top:16px;display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow-y:auto;padding-right:4px}
 .cc-result{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;transition:background 120ms,border-color 120ms;gap:2px}
 .cc-result:hover{background:var(--surface);border-color:var(--accent)}

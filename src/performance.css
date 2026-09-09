@@ -31,7 +31,7 @@
 @media (min-width:1480px){.performance-body{grid-template-columns:minmax(260px,1fr) minmax(0,820px) minmax(260px,1fr)}}
 @media (min-width:1800px){.performance-body{grid-template-columns:minmax(320px,1fr) minmax(0,860px) minmax(320px,1fr)}}
 
-.cifra-scroll{overflow-y:auto;padding:6px 20px 40vh;font-family:var(--mono);font-size:clamp(16px,1.8vw,22px);line-height:1.55;scrollbar-width:none}
+.cifra-scroll{overflow-y:auto;padding:6px 20px 40vh;font-family:var(--mono);font-size:calc(clamp(16px,1.8vw,22px) * var(--cifra-scale, 1));line-height:1.55;scrollbar-width:none}
 .cifra-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px;min-height:60vh;padding:20px;text-align:center}
 .cifra-empty-hint{color:var(--muted);font-size:15px;max-width:520px;margin:0;line-height:1.55}
 .cifra-empty-hint strong{color:var(--text);font-weight:700}
@@ -103,7 +103,7 @@
 /* Fullscreen mode */
 .fs .topbar,.fs .song-header,.fs .chord-rail,.fs .control-strip{display:none}
 .fs .performance-body{grid-template-columns:1fr;padding:0}
-.fs .cifra-scroll{padding:24px 20px 40vh;font-size:clamp(20px,2.4vw,28px)}
+.fs .cifra-scroll{padding:24px 20px 40vh;font-size:calc(clamp(20px,2.4vw,28px) * var(--cifra-scale, 1))}
 .fs-exit{position:fixed;top:14px;right:14px;z-index:15;background:rgba(20,20,28,.85);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:12px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;color:var(--text)}
 .fs-play{position:fixed;bottom:24px;right:24px;z-index:15;width:64px;height:64px;border-radius:20px;background:linear-gradient(180deg,var(--accent-strong),var(--accent));color:#1A1000;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(245,165,36,.4)}
 .fs-play .ic{width:28px;height:28px}

@@ -187,7 +187,7 @@ async function updateSong(id,mutator){
 
 export function saveCifra(id,cifraSource){return updateSong(id,song=>{song.cifraSource=String(cifraSource||'');});}
 export function saveMetadata(id,{title,artist}){return updateSong(id,song=>{if(title!=null)song.title=String(title);if(artist!=null)song.artist=String(artist);});}
-export async function saveSongEdits(id,{title,artist,cifra},sourceHint=null){
+export async function saveSongEdits(id,{title,artist,cifra,notes},sourceHint=null){
   let hintedWritePermission=null;
   if(isMp3File(sourceHint)&&sourceHint?.source?.kind==='handle'){
     hintedWritePermission=await ensureHandleWritePermission(sourceHint.source.handle);
@@ -195,7 +195,7 @@ export async function saveSongEdits(id,{title,artist,cifra},sourceHint=null){
   }
   const stored=await repository.songs.get(id);
   if(!stored)throw Error('Song not found.');
-  const updated={...stored,title:String(title??stored.title),artist:String(artist??stored.artist),cifraSource:String(cifra??stored.cifraSource),updatedAt:new Date().toISOString()};
+  const updated={...stored,title:String(title??stored.title),artist:String(artist??stored.artist),cifraSource:String(cifra??stored.cifraSource),notes:String(notes??stored.notes??''),updatedAt:new Date().toISOString()};
   let metadataWritten=false;
   if(isMp3File(stored)){
     let file;

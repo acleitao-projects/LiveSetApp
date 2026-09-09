@@ -17,6 +17,7 @@ export function newSong(input={}){
     schemaVersion:SCHEMA_VERSION,
     title:input.title||'Untitled song',
     artist:input.artist||'',
+    notes:input.notes||'',
     originalFilename:input.originalFilename||'',
     originalSize:input.originalSize||0,
     durationSeconds:input.durationSeconds||0,

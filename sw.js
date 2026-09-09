@@ -1,4 +1,4 @@
-const CACHE='liveset-shell-v51';
+const CACHE='liveset-shell-v52';
 const SHELL=[
   './',
   './index.html',
@@ -21,7 +21,9 @@ const SHELL=[
   './src/icons.js',
   './src/i18n.js',
   './src/cifraclub-import.js',
-  './src/analytics.js'
+  './src/analytics.js',
+  './src/settings-service.js',
+  './src/backup-service.js'
 ];
 
 self.addEventListener('install',event=>event.waitUntil(
