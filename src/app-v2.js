@@ -1021,6 +1021,12 @@ app.addEventListener('input',event=>{
   if(el.id==='editCifra'){editSheet.cifra=el.value;return;}
 });
 
+// Suppress the OS context menu on setlist rows (Android long-press callout,
+// desktop right-click) so long-press-to-drag stays clean.
+app.addEventListener('contextmenu',event=>{
+  if(event.target.closest('.row[draggable="true"], .row .drag'))event.preventDefault();
+});
+
 // Drag & drop reorder within the drawer
 let dragId=null;
 app.addEventListener('dragstart',event=>{
