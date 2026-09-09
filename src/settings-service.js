@@ -1,11 +1,12 @@
 // App-wide settings persisted in the appSettings IndexedDB store. Each setting is
 // a separate record keyed by id so we can atomically write one without loading all.
 
-import {repository} from './storage.js?v=35';
+import {repository} from './storage.js?v=36';
 
 const DEFAULTS = {
   fontScale: 1.0,          // multiplier on the cifra base font-size
-  onboardingCompleted: false
+  onboardingCompleted: false,
+  pitchSync: false         // route playback through pitch-shift worklet on transpose
 };
 
 async function readOne(id) {
@@ -14,14 +15,24 @@ async function readOne(id) {
 }
 
 export async function loadSettings() {
-  const [fontScale, onboardingCompleted] = await Promise.all([
+  const [fontScale, onboardingCompleted, pitchSync] = await Promise.all([
     readOne('fontScale'),
-    readOne('onboardingCompleted')
+    readOne('onboardingCompleted'),
+    readOne('pitchSync')
   ]);
   return {
     fontScale: typeof fontScale === 'number' ? fontScale : DEFAULTS.fontScale,
-    onboardingCompleted: !!onboardingCompleted
+    onboardingCompleted: !!onboardingCompleted,
+    pitchSync: !!pitchSync
   };
+}
+
+// Convert semitones (integer) → pitch ratio, clamped to the ±3 range the algorithm
+// can shift transparently. Chart transpose can go wider; that's the caller's job.
+export const PITCH_MAX_SEMITONES = 3;
+export function pitchRatioFromSemitones(semitones) {
+  const clamped = Math.max(-PITCH_MAX_SEMITONES, Math.min(PITCH_MAX_SEMITONES, Number(semitones) || 0));
+  return Math.pow(2, clamped / 12);
 }
 
 export async function saveSetting(id, value) {

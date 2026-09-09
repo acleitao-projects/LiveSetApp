@@ -82,6 +82,9 @@
 .transpose button:hover:not(:disabled){background:var(--surface)}
 .transpose .value{min-width:56px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent)}
 .transpose .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-left:6px}
+.pitch-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-left:6px;border-radius:99px;font-size:13px;font-weight:700;line-height:1}
+.pitch-badge.on{background:rgba(245,165,36,.18);color:var(--accent)}
+.pitch-badge.over{background:rgba(232,93,93,.18);color:var(--danger)}
 
 .time-progress{display:flex;align-items:center;gap:10px;padding:0 10px}
 .time-progress .time{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:88px;text-align:center}

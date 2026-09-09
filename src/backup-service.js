@@ -5,8 +5,8 @@
 // metadata but drop the handle (handles are not portable across devices) — after
 // restore, the user re-picks the file and dedupe reuses the record automatically.
 
-import {repository, readOpfsFile, writeOpfsFile, removeOpfsPath} from './storage.js?v=35';
-import {SCHEMA_VERSION} from './models.js?v=35';
+import {repository, readOpfsFile, writeOpfsFile, removeOpfsPath} from './storage.js?v=36';
+import {SCHEMA_VERSION} from './models.js?v=36';
 
 const MANIFEST_VERSION = 1;
 

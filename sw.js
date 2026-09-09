@@ -1,4 +1,4 @@
-const CACHE='liveset-shell-v55';
+const CACHE='liveset-shell-v56';
 const SHELL=[
   './',
   './index.html',
@@ -23,7 +23,8 @@ const SHELL=[
   './src/cifraclub-import.js',
   './src/analytics.js',
   './src/settings-service.js',
-  './src/backup-service.js'
+  './src/backup-service.js',
+  './src/pitch-worklet.js'
 ];
 
 // Do NOT skipWaiting here — new SWs stay in "waiting" until the user opts in via

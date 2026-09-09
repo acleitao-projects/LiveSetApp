@@ -2,22 +2,22 @@
 // changes. Bump BUILD (and search-replace ?v=NN across app-v2.js, song-service.js,
 // backup-service.js, and settings-service.js) whenever ANY internal module changes.
 // Skipping this bump is what causes stale-icon / stale-module bugs after deploys.
-const BUILD='35';
-import {repository,storageCapabilities,storageEstimate} from './storage.js?v=35';
-import {newSetlist,trackItem,breakItem,uid} from './models.js?v=35';
-import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=35';
-import {AudioEngine} from './audio.js?v=35';
-import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=35';
-import {parseCifra} from './cifra.js?v=35';
-import {chordDiagramSvg} from './chords.js?v=35';
-import {advanceCifraScroll} from './cifra-scroll.js?v=35';
-import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=35';
-import {icon} from './icons.js?v=35';
-import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=35';
-import {searchCifraClub,fetchCifraFromUrl} from './cifraclub-import.js?v=35';
-import {track,trackBoot,trackView} from './analytics.js?v=35';
-import {loadSettings,saveSetting,clampFontScale} from './settings-service.js?v=35';
-import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=35';
+const BUILD='36';
+import {repository,storageCapabilities,storageEstimate} from './storage.js?v=36';
+import {newSetlist,trackItem,breakItem,uid} from './models.js?v=36';
+import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=36';
+import {AudioEngine} from './audio.js?v=36';
+import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=36';
+import {parseCifra} from './cifra.js?v=36';
+import {chordDiagramSvg} from './chords.js?v=36';
+import {advanceCifraScroll} from './cifra-scroll.js?v=36';
+import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=36';
+import {icon} from './icons.js?v=36';
+import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=36';
+import {searchCifraClub,fetchCifraFromUrl} from './cifraclub-import.js?v=36';
+import {track,trackBoot,trackView} from './analytics.js?v=36';
+import {loadSettings,saveSetting,clampFontScale,pitchRatioFromSemitones,PITCH_MAX_SEMITONES} from './settings-service.js?v=36';
+import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=36';
 
 const app=document.querySelector('#app');
 const engine=new AudioEngine();
@@ -51,6 +51,7 @@ let previousDrawerOpen=false;
 let previousEditSheet=false;
 let previousSettingsOpen=false;
 let fontScale=1.0;
+let pitchSync=false;
 let wakeLockSentinel=null;
 let backupInputEl=null;
 let shareInputEl=null;
@@ -230,6 +231,7 @@ function renderControlStrip(song){
         <span class="value">${transpose>0?'+':''}${transpose}</span>
         <button id="transposeUp" ${song?'':'disabled'} aria-label="${esc(t('transpose_up'))}">+</button>
         <span class="label">${esc(t('semi'))}</span>
+        ${pitchSync&&transpose!==0?`<span class="pitch-badge ${Math.abs(transpose)>PITCH_MAX_SEMITONES?'over':'on'}" title="${esc(t(Math.abs(transpose)>PITCH_MAX_SEMITONES?'pitch_over_cap':'pitch_active'))}" aria-label="${esc(t(Math.abs(transpose)>PITCH_MAX_SEMITONES?'pitch_over_cap':'pitch_active'))}">♪</span>`:''}
       </div>
     </div>
     <div class="control-group transport">
@@ -420,6 +422,13 @@ function renderSettingsSheet(){
         </div>
       </div>
       <div class="field">
+        <label class="pitch-toggle">
+          <span><strong>${esc(t('pitch_sync_label'))}</strong><small class="muted" style="display:block;font-size:12px;margin-top:2px;line-height:1.4">${esc(t('pitch_sync_hint',{max:PITCH_MAX_SEMITONES}))}</small></span>
+          <input type="checkbox" id="pitchSyncToggle" ${pitchSync?'checked':''}>
+          <span class="pitch-switch"><i></i></span>
+        </label>
+      </div>
+      <div class="field">
         <label>${esc(t('backup_section'))}</label>
         <div class="settings-btn-row">
           <button class="btn" id="backupExport">${icon('download')}${esc(t('backup_export'))}</button>
@@ -547,7 +556,8 @@ async function playItemById(itemId){
     const wasSameSong=engine.session?.songId===song.id;
     await engine.playSong(song,item.id,url,workingItemIds());
     engine.updateLastKnownOrder(workingItemIds());
-    if(!wasSameSong)track('play_song',{has_cifra:!!(song.cifraSource&&song.cifraSource.trim()),transposed:!!song.transposeSemitones,source_kind:song.source?.kind||'unknown'});
+    syncEnginePitch();
+    if(!wasSameSong)track('play_song',{has_cifra:!!(song.cifraSource&&song.cifraSource.trim()),transposed:!!song.transposeSemitones,source_kind:song.source?.kind||'unknown',pitch_sync:pitchSync});
     render();
   }catch(error){
     setStatus(error.message||t('playback_failed'),true);
@@ -582,6 +592,7 @@ async function persistTranspose(delta){
   const next=Math.max(-12,Math.min(12,(song.transposeSemitones||0)+delta));
   const updated=await saveTranspose(song.id,next);
   songs=songs.map(s=>s.id===updated.id?updated:s);
+  syncEnginePitch();
   render();
 }
 
@@ -650,6 +661,14 @@ function openCifraClubSearch(){
 
 function applyFontScale(){
   document.documentElement.style.setProperty('--cifra-scale',String(fontScale));
+}
+
+function syncEnginePitch(){
+  const song=activeSong();
+  const semis=song?.transposeSemitones||0;
+  const ratio=pitchRatioFromSemitones(semis);
+  const enabled=pitchSync&&semis!==0;
+  engine.setPitchRatio(ratio,{enabled}).catch(()=>{});
 }
 
 async function adjustFontScale(delta){
@@ -978,6 +997,14 @@ app.addEventListener('change',async event=>{
       if(item){item.durationMinutes=Math.max(1,Math.min(240,Number(el.value)||15));track('break_duration_edit',{minutes:item.durationMinutes});render();}
       return;
     }
+    if(el.id==='pitchSyncToggle'){
+      pitchSync=!!el.checked;
+      await saveSetting('pitchSync',pitchSync);
+      syncEnginePitch();
+      track('pitch_sync_toggle',{enabled:pitchSync});
+      render();
+      return;
+    }
     if(el.id==='autoScroll'){
       const song=activeSong();if(!song)return;
       const updated=await saveScrollSettings(song.id,{enabled:el.checked,speed:song.cifraScrollSpeed});
@@ -1140,6 +1167,7 @@ async function boot(){
     const settings=await loadSettings();
     fontScale=clampFontScale(settings.fontScale);
     applyFontScale();
+    pitchSync=!!settings.pitchSync;
     if(!settings.onboardingCompleted)onboardingStep=0;
     songs=await listSongs();
     sets=await repository.setlists.all();
@@ -1161,7 +1189,7 @@ async function boot(){
   render();
   if('serviceWorker'in navigator){
     try{
-      swRegistration=await navigator.serviceWorker.register('./sw.js?v=15');
+      swRegistration=await navigator.serviceWorker.register('./sw.js?v=16');
       // A new SW is already waiting (installed on a previous visit but never activated)
       if(swRegistration.waiting&&navigator.serviceWorker.controller){updateAvailable=true;render();}
       swRegistration.addEventListener('updatefound',()=>{
