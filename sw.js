@@ -1,4 +1,4 @@
-const CACHE='liveset-shell-v53';
+const CACHE='liveset-shell-v54';
 const SHELL=[
   './',
   './index.html',
@@ -26,8 +26,10 @@ const SHELL=[
   './src/backup-service.js'
 ];
 
+// Do NOT skipWaiting here — new SWs stay in "waiting" until the user opts in via
+// the update pill in the app. That lets us guarantee no silent mid-gig reloads.
 self.addEventListener('install',event=>event.waitUntil(
-  caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())
+  caches.open(CACHE).then(cache=>cache.addAll(SHELL))
 ));
 self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();});
 self.addEventListener('activate',event=>event.waitUntil(

@@ -53,6 +53,8 @@ let fontScale=1.0;
 let wakeLockSentinel=null;
 let backupInputEl=null;
 let shareInputEl=null;
+let swRegistration=null;
+let reloadingForUpdate=false;
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtTime=s=>Number.isFinite(s)?`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`:'0:00';
@@ -879,7 +881,13 @@ app.addEventListener('click',async event=>{
     if(btn.id==='closeDrawer'){drawerOpen=false;return render();}
     if(btn.id==='fullscreenToggle'){fullscreen=true;track('fullscreen_toggle',{enabled:true});return render();}
     if(btn.id==='fullscreenExit'){fullscreen=false;track('fullscreen_toggle',{enabled:false});return render();}
-    if(btn.id==='applyUpdate'){track('apply_update');navigator.serviceWorker?.controller?.postMessage({type:'SKIP_WAITING'});location.reload();return;}
+    if(btn.id==='applyUpdate'){
+      track('apply_update');
+      const waiting=swRegistration?.waiting||(await navigator.serviceWorker?.getRegistration())?.waiting;
+      if(waiting){reloadingForUpdate=true;waiting.postMessage({type:'SKIP_WAITING'});}
+      else{location.reload();}
+      return;
+    }
     if(btn.id==='installApp'){
       if(installPrompt){
         try{
@@ -1146,17 +1154,30 @@ async function boot(){
   render();
   if('serviceWorker'in navigator){
     try{
-      const registration=await navigator.serviceWorker.register('./sw.js?v=13');
-      if(registration.waiting)updateAvailable=true;
-      registration.addEventListener('updatefound',()=>{
-        const worker=registration.installing;
+      swRegistration=await navigator.serviceWorker.register('./sw.js?v=14');
+      // A new SW is already waiting (installed on a previous visit but never activated)
+      if(swRegistration.waiting&&navigator.serviceWorker.controller){updateAvailable=true;render();}
+      swRegistration.addEventListener('updatefound',()=>{
+        const worker=swRegistration.installing;
         worker?.addEventListener('statechange',()=>{
           if(worker.state==='installed'&&navigator.serviceWorker.controller){updateAvailable=true;render();}
         });
       });
+      // The waiting SW is skipped and takes over → controllerchange fires.
+      // Only reload if the user opted in via the update pill; otherwise leave
+      // the current tab alone.
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        if(reloadingForUpdate)location.reload();
+      });
     }catch(_){/* ignore */}
   }
 }
+
+// Actively check for a new SW whenever the tab regains focus so long-running
+// PWA sessions notice a fresh deploy.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&swRegistration){swRegistration.update().catch(()=>{});}
+});
 
 // Test hooks
 window.__liveset={engine,snapshot:()=>engine.snapshot(),songs:()=>structuredClone(songs),sets:()=>structuredClone(sets),working:()=>structuredClone(working)};
