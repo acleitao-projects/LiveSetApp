@@ -1,16 +1,20 @@
-import {repository,storageCapabilities,storageEstimate} from './storage.js';
-import {newSetlist,trackItem,breakItem} from './models.js';
-import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js';
-import {AudioEngine} from './audio.js';
-import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js';
-import {parseCifra} from './cifra.js';
-import {chordDiagramSvg} from './chords.js';
-import {advanceCifraScroll} from './cifra-scroll.js';
-import {transposeChordLine,transposeChordSymbol} from './transpose.js';
-import {icon} from './icons.js';
-import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js';
-import {searchCifraClub,fetchCifraFromUrl} from './cifraclub-import.js';
-import {track,trackBoot,trackView} from './analytics.js';
+// Query string on each import busts browser + service-worker cache when we push
+// changes. Bump BUILD when any of these files change together, or bump the file's
+// own suffix if only one changed.
+const BUILD='30';
+import {repository,storageCapabilities,storageEstimate} from './storage.js?v=30';
+import {newSetlist,trackItem,breakItem} from './models.js?v=30';
+import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=30';
+import {AudioEngine} from './audio.js?v=30';
+import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=30';
+import {parseCifra} from './cifra.js?v=30';
+import {chordDiagramSvg} from './chords.js?v=30';
+import {advanceCifraScroll} from './cifra-scroll.js?v=30';
+import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=30';
+import {icon} from './icons.js?v=30';
+import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=30';
+import {searchCifraClub,fetchCifraFromUrl} from './cifraclub-import.js?v=30';
+import {track,trackBoot,trackView} from './analytics.js?v=30';
 
 const app=document.querySelector('#app');
 const engine=new AudioEngine();

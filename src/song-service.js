@@ -1,6 +1,6 @@
-import {newSong} from './models.js';
-import {repository,storageCapabilities,writeOpfsFile,readOpfsFile,removeOpfsPath} from './storage.js';
-import {isMp3File,readMp3Metadata,rewriteMp3Metadata} from './id3.js';
+import {newSong} from './models.js?v=30';
+import {repository,storageCapabilities,writeOpfsFile,readOpfsFile,removeOpfsPath} from './storage.js?v=30';
+import {isMp3File,readMp3Metadata,rewriteMp3Metadata} from './id3.js?v=30';
 
 const AUDIO_ACCEPT='.mp3,.m4a,.aac,.wav,.flac,.ogg,.oga,.opus,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/flac,audio/ogg,audio/*';
 
