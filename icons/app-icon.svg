@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="LiveSet 1">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#15151C"/>
+      <stop offset="1" stop-color="#0A0A0F"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-weight="900" font-size="176" letter-spacing="-6" fill="#F5F5F7" text-anchor="middle">
+    <text x="140" y="316">LS</text>
+    <text x="392" y="316">1</text>
+  </g>
+  <polygon fill="#F5A524" points="240,246 296,278 240,310"/>
+</svg>

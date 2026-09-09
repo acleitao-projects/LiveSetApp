@@ -1,359 +1,88 @@
-# LiveSet 1 — V1 Acceptance Tests
+# LiveSet 1 — Acceptance tests
 
-These scenarios are product acceptance criteria. A feature checkbox in `progress.md` should not be marked complete until its relevant tests pass.
+Manual acceptance scenarios for v0.2. Automated coverage is `npm test`.
 
-## A. PWA and offline
+## S1. Add a song
 
-### A1 Install/launch Android tablet
+1. Open the app on Chrome desktop.
+2. Open the set list drawer, tap ADD SONG, pick an audio file from the OS.
+3. The song row appears with the file's name as title and the file's name as subtitle.
+4. Tap the row → the song plays. Transport shows elapsed time advancing.
 
-- Install PWA.
-- Launch standalone.
-- Confirm app shell renders correctly.
+## S2. Cifra edit
 
-Expected: pass.
+1. Tap the pencil icon on a song row.
+2. Type or paste `[Intro]\nAm  F  C  G\n\n[Verse]\nLine one\n`.
+3. Save. Sheet closes.
+4. Play the song → cifra renders with chord row above the empty line and section header in accent color.
 
-### A2 Install/launch iPad
+## S3. Import .txt cifra
 
-- Add/install PWA using supported iPad flow.
-- Launch standalone.
+1. Open the edit sheet for a song.
+2. Tap `IMPORT .TXT / .CHO`, pick a text file with a cifra.
+3. Textarea contents are replaced with the file's text.
+4. Save → the imported cifra shows on the Performance screen.
 
-Expected: pass.
+## S4. Transpose
 
-### A3 Offline reopen
+1. Play a song with a cifra containing `Am F C G`.
+2. Tap the `+` transpose button twice → indicator shows `+2`, chords render as `Bm G D A`, chord diagrams update.
+3. Reload the page → transpose is still `+2` on that song.
 
-- Prepare app/model/local media.
-- Enable airplane mode.
-- Kill/reopen PWA.
+## S5. Playback invariant during list edits
 
-Expected:
-- shell loads;
-- saved setlists load;
-- local tracks visible;
-- existing songs play;
-- chord diagrams render;
-- splitter reports ready only if model is cached locally.
+1. Start playing song A.
+2. Open the drawer. Reorder upcoming songs. Add a break. Remove an upcoming row. Edit the break's minutes.
+3. Song A continues to play throughout. Time keeps advancing. `document.querySelector('#app').dataset.engineId` and `sessionId` are unchanged.
 
-## B. Plain audio import
+## S6. Playback invariant during cifra edit
 
-### B1 Add plain audio to empty set
+1. Start playing song A.
+2. Tap the pencil icon on A's row. Type in the cifra field. Save.
+3. Song A is still playing at the expected time.
 
-- New setlist.
-- Add Song.
-- Select browser-decodable audio.
+## S7. Playback invariant during transpose / speed
 
-Expected:
-- one internal Track created;
-- red badge;
-- song playable;
-- no stem controls active.
+1. Start playing.
+2. Tap transpose + / -. Move the auto-scroll speed slider.
+3. Playback continues at the same `currentTime` trajectory.
 
-### B2 Same track in multiple setlists
+## S8. Break behaviour
 
-- Add same internal track to Set A and Set B.
+1. Set list: song A → break → song B.
+2. Play A. Let it end.
+3. Performance screen shows the break header. Neither A nor B is playing.
+4. Tap Play or Next → B starts.
 
-Expected:
-- one media copy;
-- two references.
+## S9. Dedupe
 
-## C. Critical live request flow
+1. Add a song, edit its cifra, transpose it +3, save the set list.
+2. Add the same file again (any set list).
+3. The Song appears with the previous cifra and `+3` transpose already applied.
 
-### C1 Add Wonderwall while Creep plays
+## S10. Save semantics
 
-Setup:
+1. Open a saved set list. Add a song. Do NOT press SAVE.
+2. Reload the page.
+3. The added song is gone; the set list is exactly as it was.
+4. Transpose and scroll speed edits made in step 1 on any song are still there (they persist immediately, independent of setlist SAVE).
 
-```text
-01 Wicked Game
-02 Creep
-03 Drive
-```
+## S11. Fullscreen
 
-Start `Creep` and allow it to play for at least 20 seconds.
+1. Play a song.
+2. Tap the fullscreen icon in the top bar.
+3. Only cifra + a floating play/pause pill are visible.
+4. Escape or the exit chip returns to the standard view. Playback is unaffected.
 
-While it plays:
+## S12. Offline
 
-1. open burger;
-2. tap `+` on Creep row;
-3. choose Wonderwall audio;
-4. wait for import;
-5. close drawer.
+1. Load the app, register the service worker, add a song via the OPFS-copy path (iPad Safari or the input fallback).
+2. Turn off the network.
+3. Reload — the app loads from cache. Play — audio plays from OPFS.
 
-Expected:
+## S13. Phone layout
 
-```text
-01 Wicked Game
-02 Creep          (still playing)
-03 Wonderwall
-04 Drive
-```
-
-Audio assertions:
-
-- Creep never receives a programmatic pause/stop;
-- playback currentTime does not reset;
-- volume does not drop due to player recreation;
-- AudioEngine session ID remains same;
-- after Creep ends/Next, Wonderwall is next.
-
-### C2 Insert below a non-current row
-
-While Creep plays, tap `+` on Drive and import Song X.
-
-Expected: Song X appears below Drive, not below Creep. Creep continues.
-
-### C3 Remove upcoming track
-
-While Creep plays, remove Drive.
-
-Expected: Creep continues. New Next reflects latest sequence.
-
-### C4 Reorder upcoming tracks
-
-While Creep plays, reorder rows repeatedly.
-
-Expected: no stop/restart; latest ordering controls Next.
-
-### C5 Remove active row
-
-While Creep plays, remove Creep row.
-
-Expected:
-- Creep keeps playing;
-- now-playing UI remains Creep;
-- list no longer contains its row;
-- when Creep finishes, next is resolved from updated working list.
-
-### C6 Add/remove/reorder break during playback
-
-Expected: zero playback interruption.
-
-## D. Explicit setlist save semantics
-
-### D1 Unsaved reorder
-
-- Open saved Set A.
-- Reorder.
-- Do not Save.
-- Choose Open Set B.
-
-Expected: warning waits for Discard/Cancel.
-
-### D2 Cancel discard
-
-Choose Cancel.
-
-Expected: remain on modified Set A working copy.
-
-### D3 Discard
-
-Choose Discard.
-
-Expected: Set B opens. Persistent Set A remains original.
-
-### D4 Save
-
-Modify Set A and press Save.
-
-Expected: reopen shows new ordering.
-
-## E. Breaks
-
-### E1 Insert break
-
-Add 15-minute break and save.
-
-Expected: persists.
-
-### E2 Reorder break
-
-Move break between other songs while audio plays.
-
-Expected: audio unchanged.
-
-### E3 Reach break
-
-Finish/Next into Break.
-
-Expected: app does not auto-play the post-break song.
-
-## F. Track Editor without splitting
-
-### F1 New file + cifra
-
-- Open editor empty.
-- Select new audio.
-- Enter title/artist/genre.
-- Paste cifra.
-- Save Track without Split.
-
-Expected:
-- track persisted;
-- red status;
-- original plays;
-- cifra renders.
-
-### F2 Reopen existing track
-
-Expected fields/source spacing preserved.
-
-## G. Stem split
-
-### G1 Five outputs
-
-Run splitter on compatible device.
-
-Expected exactly:
-
-- Vocals
-- Guitar
-- Bass
-- Drums
-- Other
-
-All pass validation.
-
-### G2 Green status
-
-Save complete stems.
-
-Expected track badge green.
-
-### G3 Playback uses stems only
-
-Mute Vocals.
-
-Expected vocal stem removed from mix; original is not simultaneously audible.
-
-### G4 Persist mute
-
-Mute Vocals, leave/reopen track.
-
-Expected mute remains.
-
-### G5 Missing stem fallback
-
-Simulate/delete/corrupt one stem in test fixture.
-
-Expected:
-- status invalid/red;
-- app plays original;
-- does not play remaining 4 stems automatically.
-
-### G6 Re-split warning
-
-Split green track again.
-
-Expected replacement warning.
-
-### G7 Cancel replace
-
-Expected old stems untouched.
-
-### G8 Failed replace
-
-Confirm replacement, force split failure.
-
-Expected old valid stems remain.
-
-## H. Cifra
-
-### H1 Chords above lyrics
-
-Paste normal cifra with chord lines.
-
-Expected performance rendering keeps chord/lyric association.
-
-### H2 Section labels
-
-`[Intro]`, `[Verse]`, `[Chorus]` recognized/preserved.
-
-### H3 Scroll speed persistence
-
-Set auto-scroll speed, play/use it, leave track, reopen.
-
-Expected last speed restored without Setlist Save.
-
-### H4 Plain lyrics
-
-No chord lines.
-
-Expected lyrics still render; no crash.
-
-## I. Chord diagrams
-
-### I1 Common chords offline
-
-Airplane mode. Load track containing:
-
-`C Cm C7 Cmaj7 C#m F# Bb Am7 G/B Cadd9 Dsus4`
-
-Expected recognized chord diagrams available for supported dataset forms.
-
-### I2 Unknown symbol
-
-Include exotic/unresolved symbol.
-
-Expected cifra text remains; no renderer exception.
-
-## J. `.liveset` packages
-
-### J1 Export complete setlist
-
-Export saved set with mix of red and green tracks.
-
-Expected single `.liveset` file.
-
-### J2 Import on clean install/profile
-
-Expected:
-- setlist recreated;
-- tracks recreated;
-- original-only tracks red/play;
-- stem tracks green/play with settings/cifra.
-
-### J3 Package corruption
-
-Remove required file from archive fixture.
-
-Expected import rejected safely, no half-imported permanent state.
-
-### J4 Path traversal security
-
-Malicious archive paths.
-
-Expected rejected/sanitized; cannot escape import temp root.
-
-## K. Stress/performance
-
-### K1 Long setlist
-
-At least 100 song/break items.
-
-Expected drawer usable; editing does not rebuild audio engine.
-
-### K2 Large import during playback
-
-Import large song while another plays.
-
-Expected current audio remains active; UI remains reasonably responsive.
-
-### K3 Repeated mutations
-
-During one song perform 50 list mutations.
-
-Expected no orphaned audio contexts/nodes, no restart.
-
-### K4 Storage failure
-
-Simulate quota failure during split/import.
-
-Expected clear error; existing track data safe; temp cleaned where possible.
-
-## L. Required platform sign-off
-
-Do not call V1 complete until the critical tests above have actual pass evidence on:
-
-- at least one target Android tablet;
-- at least one target iPad.
-
-Record device model, OS version, browser/PWA version and result in `progress.md`.
-
+1. Open the app on a phone-width viewport.
+2. Chord rails collapse into a horizontal strip above the cifra.
+3. Transport is still centered and thumb-reachable. Play button remains large.
+4. Drawer and edit sheet become full-screen.

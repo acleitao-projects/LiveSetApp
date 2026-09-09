@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 80" role="img" aria-label="LiveSet 1">
+  <style>
+    .glyph{font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-weight:800;font-size:64px;letter-spacing:-2px;fill:#F5F5F7}
+    .accent{fill:#F5A524}
+  </style>
+  <text class="glyph" x="6" y="60">LS</text>
+  <polygon class="accent" points="98,32 118,44 98,56"/>
+  <text class="glyph" x="130" y="60">1</text>
+</svg>

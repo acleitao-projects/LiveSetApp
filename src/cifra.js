@@ -1,9 +1,11 @@
 const ROOTS='A|B|C|D|E|F|G';
 const ACCIDENTAL='(?:#|b)?';
 const QUALITY='(?:m|maj|min|dim|aug|sus2|sus4|sus|add)?';
-const EXTENSION='(?:2|4|5|6|7|9|11|13)?';
-const ALTERATIONS='(?:[#b](?:5|9|11|13))*';
-const BASS=`(?:\/(?:${ROOTS})${ACCIDENTAL})?`;
+// Extension: Brazilian 7M/9M/13M (= major-seventh/ninth/thirteenth), or standard numeric.
+const EXTENSION='(?:7M|9M|13M|2|4|5|6|7|9|11|13)?';
+// Alterations: sequences like #5, b9, or plain 4/9 (from stripped parens: E7(4) → E74).
+const ALTERATIONS='(?:[#b]?(?:2|4|5|6|9|11|13))*';
+const BASS=`(?:\\/(?:${ROOTS})${ACCIDENTAL})?`;
 export const CHORD_PATTERN=new RegExp(`^(?:${ROOTS})${ACCIDENTAL}${QUALITY}${EXTENSION}${ALTERATIONS}${BASS}$`,'i');
 
 export function normalizeChordSymbol(value){

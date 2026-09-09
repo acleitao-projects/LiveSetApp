@@ -1,5 +1,45 @@
 # LiveSet 1 — Implementation Progress
 
+> **v0.2 reset (2026-09-09).** The app was over-scoped and did not function for the intended musician + tablet workflow. The AI stem separation pipeline never worked on target devices, and the library-import ceremony was friction the user rejected. Everything below this section documents the prior v0.1 architecture and is retained for historical context only — it does not describe the current codebase.
+
+## v0.2 reset — 2026-09-09
+
+**Removed (kill list):**
+- AI stem separation: `src/stem-*.js`, `src/model-asset-service.js`, `src/m4a-media.js`, ONNX Runtime Web, Mediabunny.
+- `.liveset` package format: `src/liveset-package*.js`, fflate vendor lib.
+- `src/track-service.js`, `src/app.js`, `src/ui-runtime-fixes.js`, `splitstem.html`, `preview.html`, `qualification/`, stem/liveset/stress tests.
+- All old CSS files (`app.css`, `refinement.css`, `brand.css`, `editor.css`, `performance-v1.css`, `scrollbar.css`) and `logo.png`.
+- Track Editor view, EXPORT/IMPORT .LIVESET, TRACK EDITOR drawer buttons, source-chooser modal, library modal, stem controls, model UI, WebGPU/HTTPS/OPFS capability panels.
+
+**Added / reworked:**
+- `src/models.js` — new `Song` schema (schemaVersion 2), setlist item now stores `songId`.
+- `src/storage.js` — trimmed to IndexedDB (`songs`, `setlists`, `appSettings`) + OPFS wrapper; capability detection includes File System Access API.
+- `src/song-service.js` — new. `pickAndRegisterSong` branches on FS Access API vs `<input type=file>` + OPFS copy. Dedupes by filename+size. Immediate save for cifra/metadata/transpose/scroll settings.
+- `src/transpose.js` — new. Pure `transposeChordToken` / `transposeChordLine`, sharps by default, handles slash bass, non-chord tokens pass through.
+- `src/audio.js` — simplified to a single long-lived `<audio>` element engine. `snapshot()` diagnostics retained. All stem code removed.
+- `src/icons.js` — new inline SVG icon set replacing unicode glyphs.
+- `logo.svg` — new "LS·1" wordmark with amber play triangle. `logo.png` deleted.
+- `src/app.css`, `src/performance.css` — brand-new design system. Dark obsidian background, amber (#F5A524) accent, big touch targets, tablet-primary + phone-tolerant layout, dedicated fullscreen mode.
+- `src/app-v2.js` — full rewrite. New shell: top bar → song header → cifra body → control strip (transpose · transport · scroll controls). Set list drawer with row-level edit/remove/drag, direct ADD SONG picker, break rows. Per-song cifra edit sheet with `.txt`/`.cho` import.
+- Manifest / theme color updated to `#0A0A0F`. Service worker cache bumped to `v40`, precache list rewritten.
+- Docs replaced: `README.md`, `product.md`, `architecture.md`, `features.md`, `acceptance_tests.md`.
+- Tests: `test/setlist.test.js` updated for `songId`; added `test/transpose.test.js` (8 cases). Removed stem/liveset/stress/track-service tests. Full run: **20 passed, 0 failed**.
+
+**Behavioral guarantees preserved:**
+- `AudioEngine` singleton across renders; `<audio>` element lives outside the rendered DOM tree.
+- Set list mutations use stable IDs and never touch the engine.
+- Cifra scroll speed persists immediately per song; transpose now behaves the same way.
+
+**Remaining before v1 sign-off:**
+- Manual acceptance run on real Android Chrome tablet.
+- Manual acceptance run on real iPad Safari (Home Screen PWA + OPFS-copy path).
+- Manual acceptance run on real phone-width viewport.
+- Regenerate the 192/512/maskable PNG icons from `logo.svg` (currently the manifest advertises the SVG plus the old PNGs; browsers that ignore SVG icons will still show the old artwork).
+
+---
+
+## Historical (v0.1) — retained for context
+
 > Codex: keep this file current. Do not mark an item complete because the UI exists. Mark complete only when the behavior is implemented and relevant acceptance tests pass.
 
 ## Status legend
