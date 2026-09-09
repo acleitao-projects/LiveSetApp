@@ -77,14 +77,15 @@
 .tp-btn.play .ic{width:32px;height:32px}
 .tp-btn.play:hover:not(:disabled){background:linear-gradient(180deg,#FFC760,var(--accent-strong))}
 
-.transpose{display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:4px}
+.transpose{display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:4px 6px}
+.transpose .glyph{font-weight:800;color:var(--muted);font-size:14px;padding:0 4px 0 2px;letter-spacing:.02em}
 .transpose button{width:38px;height:44px;border-radius:10px;color:var(--text);font-weight:700;font-size:20px}
 .transpose button:hover:not(:disabled){background:var(--surface)}
-.transpose .value{min-width:56px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent)}
-.transpose .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-left:6px}
-.pitch-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-left:6px;border-radius:99px;font-size:13px;font-weight:700;line-height:1}
-.pitch-badge.on{background:rgba(245,165,36,.18);color:var(--accent)}
-.pitch-badge.over{background:rgba(232,93,93,.18);color:var(--danger)}
+.transpose .value{min-width:44px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent)}
+.transpose.audio-pitch{margin-left:6px}
+.transpose.audio-pitch .glyph{font-size:16px}
+.transpose.audio-pitch.active{border-color:var(--accent);background:rgba(245,165,36,.08)}
+.transpose.audio-pitch.active .glyph{color:var(--accent)}
 
 .time-progress{display:flex;align-items:center;gap:10px;padding:0 10px}
 .time-progress .time{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:88px;text-align:center}
@@ -141,8 +142,8 @@
   .tp-btn.play{width:60px;height:60px;border-radius:16px}
   .tp-btn.play .ic{width:26px;height:26px}
   .transpose button{width:44px;height:44px;font-size:20px}
-  .transpose .value{min-width:48px}
-  .transpose .label{margin-left:0}
+  .transpose .value{min-width:36px}
+  .transpose.audio-pitch{margin-left:8px}
   .time-progress{padding:0 4px}
   .time-progress .time{min-width:76px;font-size:12px}
   .song-header{padding:10px 14px 6px}
@@ -151,7 +152,9 @@
   .next-chip strong{max-width:90px}
 }
 @media (max-width:380px){
-  .transpose button{width:38px;height:40px;font-size:18px}
+  .transpose button{width:34px;height:38px;font-size:18px}
+  .transpose .value{min-width:28px;font-size:14px}
+  .transpose .glyph{font-size:12px;padding:0 2px}
   .scroll-controls .speed input[type=range]{max-width:110px}
   .tp-btn{width:44px;height:44px}
   .tp-btn.play{width:54px;height:54px}

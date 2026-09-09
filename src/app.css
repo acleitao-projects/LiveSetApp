@@ -158,13 +158,6 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-
 .font-scale-row{display:flex;align-items:center;gap:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:10px 14px}
 .font-scale-row .btn{min-height:44px;width:52px;padding:0;font-weight:800}
 .font-scale-preview{flex:1;text-align:center;font-family:var(--mono);color:var(--accent);font-weight:700;transition:font-size 120ms}
-.pitch-toggle{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer}
-.pitch-toggle strong{font-weight:600;color:var(--text);text-transform:none;letter-spacing:0}
-.pitch-toggle input[type=checkbox]{position:absolute;opacity:0;pointer-events:none;width:0;height:0}
-.pitch-switch{width:44px;height:26px;background:var(--border);border-radius:99px;position:relative;transition:background 160ms;flex-shrink:0}
-.pitch-switch i{position:absolute;top:3px;left:3px;width:20px;height:20px;background:var(--text);border-radius:99px;transition:transform 160ms}
-.pitch-toggle input:checked ~ .pitch-switch{background:var(--accent)}
-.pitch-toggle input:checked ~ .pitch-switch i{transform:translateX(18px);background:#1A1000}
 .settings-btn-row{display:flex;gap:8px;flex-wrap:wrap}
 .settings-btn-row .btn{flex:1;min-width:140px;justify-content:flex-start}
 

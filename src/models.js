@@ -24,6 +24,7 @@ export function newSong(input={}){
     source:input.source||null,
     cifraSource:input.cifraSource||'',
     transposeSemitones:input.transposeSemitones||0,
+    audioPitchSemitones:input.audioPitchSemitones||0,
     cifraScrollSpeed:input.cifraScrollSpeed??1,
     cifraAutoScrollEnabled:!!input.cifraAutoScrollEnabled,
     createdAt:input.createdAt||now,

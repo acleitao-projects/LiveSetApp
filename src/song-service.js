@@ -1,6 +1,6 @@
-import {newSong} from './models.js?v=36';
-import {repository,storageCapabilities,writeOpfsFile,readOpfsFile,removeOpfsPath} from './storage.js?v=36';
-import {isMp3File,readMp3Metadata,rewriteMp3Metadata} from './id3.js?v=36';
+import {newSong} from './models.js?v=37';
+import {repository,storageCapabilities,writeOpfsFile,readOpfsFile,removeOpfsPath} from './storage.js?v=37';
+import {isMp3File,readMp3Metadata,rewriteMp3Metadata} from './id3.js?v=37';
 
 const AUDIO_ACCEPT='.mp3,.m4a,.aac,.wav,.flac,.ogg,.oga,.opus,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/flac,audio/ogg,audio/*';
 
@@ -219,6 +219,7 @@ export async function saveSongEdits(id,{title,artist,cifra,notes},sourceHint=nul
   return {song:updated,metadataWritten};
 }
 export function saveTranspose(id,semitones){return updateSong(id,song=>{song.transposeSemitones=Math.max(-12,Math.min(12,Math.round(Number(semitones)||0)));});}
+export function saveAudioPitch(id,semitones){return updateSong(id,song=>{song.audioPitchSemitones=Math.max(-3,Math.min(3,Math.round(Number(semitones)||0)));});}
 export function saveScrollSettings(id,{speed,enabled}){return updateSong(id,song=>{if(speed!=null)song.cifraScrollSpeed=Math.max(0,Math.min(5,Number(speed)||0));if(enabled!=null)song.cifraAutoScrollEnabled=!!enabled;});}
 
 export async function deleteSong(id){
