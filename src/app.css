@@ -100,6 +100,12 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-
 .phone-only{display:none}
 
 /* Drawer more-menu popover (mobile) */
+.drawer-more .btn.icon{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;width:44px;height:44px;color:var(--text)}
+.drawer-more .btn.icon .ic{width:20px;height:20px}
+.drawer-more .btn.icon:hover:not(:disabled){background:var(--surface);border-color:var(--accent);color:var(--accent)}
+.drawer-more .btn.icon[aria-expanded="true"]{background:var(--surface);border-color:var(--accent);color:var(--accent)}
+.drawer-foot .btn.icon.ghost#openSettings{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;width:44px;height:44px;color:var(--text)}
+.drawer-foot .btn.icon.ghost#openSettings:hover:not(:disabled){background:var(--surface);border-color:var(--accent);color:var(--accent)}
 .drawer-more-menu{position:absolute;bottom:calc(100% + 6px);right:0;min-width:180px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:6px;z-index:5;display:flex;flex-direction:column;gap:2px}
 .drawer-more-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--text);font-size:14px;font-weight:600;text-align:left;background:transparent;border:0;cursor:pointer;white-space:nowrap}
 .drawer-more-item:hover{background:var(--surface)}
