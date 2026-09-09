@@ -48,7 +48,15 @@ const activeSong=()=>songs.find(s=>s.id===engine.session?.songId);
 const songById=id=>songs.find(s=>s.id===id);
 const workingItemIds=()=>working.items.map(i=>i.id);
 
-function setStatus(msg,error=false){statusMessage=msg;statusError=!!error;}
+let statusTimer=0;
+function setStatus(msg,error=false){
+  statusMessage=msg;statusError=!!error;
+  clearTimeout(statusTimer);
+  if(msg){
+    const ttl=error?6500:3500;
+    statusTimer=setTimeout(()=>{statusMessage='';statusError=false;render();},ttl);
+  }
+}
 
 // ---------- Rendering ----------
 
