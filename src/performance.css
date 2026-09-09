@@ -62,9 +62,11 @@
 .cifra-row pre{margin:0;font:inherit;white-space:pre;overflow-wrap:normal}
 .cifra-empty{padding:60px 20px;text-align:center;color:var(--muted)}
 
-/* Control strip */
-.control-strip{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+/* Control strip: transport sits in a natural-width middle column so it's truly
+   screen-centered; the flanking groups take equal 1fr columns and align outward */
+.control-strip{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
 .control-group{display:flex;align-items:center;gap:8px}
+.control-group.left{justify-self:start}
 .control-group.transport{justify-self:center;gap:10px}
 .control-group.right{justify-self:end}
 
