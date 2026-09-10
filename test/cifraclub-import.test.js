@@ -21,6 +21,16 @@ test('drops inline ">>" separators without touching the surrounding text', () =>
   assert.equal(cleanClipboardCifra(dirty), 'Am   F C   G\nWhisper words of wisdom');
 });
 
+test('drops a single inline ">" marker', () => {
+  const dirty = 'Intro: G > D > Em > C\nAm   F > C   G\nWhisper words of wisdom';
+  assert.equal(cleanClipboardCifra(dirty), 'Intro: G D Em C\nAm   F C   G\nWhisper words of wisdom');
+});
+
+test('strips a blockquote-style ">" line prefix but keeps chord alignment', () => {
+  const dirty = '[Verse]\n>     Am        F\n> Let it be, let it be';
+  assert.equal(cleanClipboardCifra(dirty), '[Verse]\n    Am        F\nLet it be, let it be');
+});
+
 test('normalizes non-breaking spaces and collapses excess blank lines', () => {
   const dirty = 'C  G\n\n\n\nLyric line';
   assert.equal(cleanClipboardCifra(dirty), 'C  G\n\nLyric line');
