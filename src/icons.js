@@ -35,6 +35,8 @@ const ICONS={
   download:S('<path d="M12 4v12"/><path d="M6 14l6 6 6-6"/><path d="M4 20h16"/>'),
   undo:S('<path d="M9 7L4 12l5 5"/><path d="M4 12h11a5 5 0 0 1 0 10h-1"/>'),
   redo:S('<path d="M15 7l5 5-5 5"/><path d="M20 12H9a5 5 0 0 0 0 10h1"/>'),
+  volume:S('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8a5 5 0 0 1 0 8"/><path d="M19 5a9 9 0 0 1 0 14"/>'),
+  volumeX:S('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M22 9l-6 6"/><path d="M16 9l6 6"/>'),
   clipboard:S('<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6"/><path d="M9 15h6"/>'),
   search:S('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>')
 };

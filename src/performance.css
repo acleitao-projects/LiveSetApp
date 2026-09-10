@@ -85,6 +85,8 @@
 .tp-btn.play{width:72px;height:72px;border-radius:20px;background:linear-gradient(180deg,var(--accent-strong),var(--accent));color:#1A1000;border-color:transparent;box-shadow:0 8px 22px rgba(245,165,36,.35)}
 .tp-btn.play .ic{width:32px;height:32px}
 .tp-btn.play:hover:not(:disabled){background:linear-gradient(180deg,#FFC760,var(--accent-strong))}
+.tp-btn.mute-btn{flex:0 0 auto}
+.tp-btn.mute-btn.active{background:rgba(245,165,36,.14);border-color:var(--accent);color:var(--accent)}
 
 .transpose{display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:4px 6px}
 .transpose .glyph{font-weight:800;color:var(--muted);font-size:14px;padding:0 4px 0 2px;letter-spacing:.02em}
@@ -120,6 +122,9 @@
 .fs-exit{position:fixed;top:14px;right:14px;z-index:15;background:rgba(20,20,28,.85);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:12px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;color:var(--text)}
 .fs-play{position:fixed;bottom:24px;right:24px;z-index:15;width:64px;height:64px;border-radius:20px;background:linear-gradient(180deg,var(--accent-strong),var(--accent));color:#1A1000;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(245,165,36,.4)}
 .fs-play .ic{width:28px;height:28px}
+.fs-mute{position:fixed;bottom:24px;left:24px;z-index:15;background:rgba(20,20,28,.85);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:12px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;color:var(--text)}
+.fs-mute .ic{width:24px;height:24px}
+.fs-mute.active{background:rgba(245,165,36,.16);border-color:var(--accent);color:var(--accent)}
 
 /* Phone / narrow */
 @media (max-width:900px){
@@ -140,7 +145,8 @@
 @media (max-width:640px){
   .control-strip{grid-template-columns:1fr;grid-template-rows:auto auto auto;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));row-gap:6px}
   .control-group.transport{grid-row:1;justify-self:center;gap:8px}
-  .control-group.left{grid-row:2;justify-self:stretch}
+  .control-group.left{grid-row:2;justify-self:stretch;gap:6px}
+  .control-group.left .mute-btn{width:44px;height:44px}
   .control-group.right{grid-row:3;justify-self:stretch}
   .transpose{width:100%;justify-content:space-between;padding:4px 6px}
   .scroll-controls{width:100%;justify-content:space-between;padding:6px 10px;height:auto}

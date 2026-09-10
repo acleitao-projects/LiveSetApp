@@ -31,6 +31,7 @@ export class AudioEngine extends EventTarget{
     this.pitchModeReady=false;
     this.pitchModeActive=false;   // true when audio is currently routed via worklet
     this.currentPitchRatio=1.0;
+    this.userMuted=false;         // app-wide "silent, cifra only" toggle; persists across songs
 
     this.audio.addEventListener('timeupdate',()=>this.dispatchEvent(new Event('state')));
     this.audio.addEventListener('play',()=>{this.resumeContext();this.dispatchEvent(new Event('state'));});
@@ -135,22 +136,38 @@ export class AudioEngine extends EventTarget{
     this.currentPitchRatio=target;
     if(!enabled||target===1){
       // Direct mode
-      if(this.pitchModeReady){
-        this.directGain.gain.value=1;
-        this.pitchGain.gain.value=0;
-      }
       this.pitchModeActive=false;
+      this.applyOutputGains();
       return;
     }
     // Enable pitch mode; lazy-build pipeline if needed
     if(!this.pitchModeReady)await this.ensurePitchPipeline();
     if(!this.pitchModeReady)return; // unsupported → silently no-op
     this.pitchNode.port.postMessage({pitchRatio:target});
-    this.directGain.gain.value=0;
-    this.pitchGain.gain.value=1;
     this.pitchModeActive=true;
+    this.applyOutputGains();
     this.resumeContext();
   }
+
+  // Single source of truth for the two output gains, given the pitch A/B routing
+  // and the mute toggle. Keeps direct + pitched paths consistent.
+  applyOutputGains(){
+    if(!this.pitchModeReady)return;
+    const wantPitch=this.pitchModeActive&&!this.userMuted;
+    const wantDirect=!this.pitchModeActive&&!this.userMuted;
+    this.directGain.gain.value=wantDirect?1:0;
+    this.pitchGain.gain.value=wantPitch?1:0;
+  }
+
+  // App-wide mute: audio keeps playing (position advances, cifra auto-scroll
+  // keeps running) but output is silent. Persists across song changes.
+  setMuted(muted){
+    this.userMuted=!!muted;
+    this.audio.muted=this.userMuted;
+    this.applyOutputGains();
+    this.dispatchEvent(new Event('state'));
+  }
+  get muted(){return !!this.userMuted;}
 
   get currentTime(){return this.audio.currentTime||0;}
   get duration(){return this.audio.duration||0;}
@@ -169,6 +186,7 @@ export class AudioEngine extends EventTarget{
       duration:this.duration,
       paused:this.paused,
       volume:this.volume,
+      muted:this.userMuted,
       pitchActive:this.pitchModeActive,
       pitchRatio:this.currentPitchRatio,
       metrics:{...this.metrics}

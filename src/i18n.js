@@ -192,7 +192,11 @@ const DICTS = {
     clipboard_import_ok: 'Pasted from clipboard.',
     // Web Share
     share_setlist_native: 'Share set list',
-    share_setlist_text: 'Set list: {name}'
+    share_setlist_text: 'Set list: {name}',
+    // Mute
+    mute: 'Mute audio',
+    unmute: 'Unmute audio',
+    muted_badge: 'Muted'
   },
   pt: {
     ready: 'Pronto',
@@ -364,7 +368,11 @@ const DICTS = {
     clipboard_import_ok: 'Colado da área de transferência.',
     // Web Share
     share_setlist_native: 'Compartilhar repertório',
-    share_setlist_text: 'Repertório: {name}'
+    share_setlist_text: 'Repertório: {name}',
+    // Mute
+    mute: 'Silenciar áudio',
+    unmute: 'Ativar áudio',
+    muted_badge: 'Sem áudio'
   }
 };
 
