@@ -19,7 +19,9 @@ export function moveItem(set,id,to){
 }
 export function isDirty(working,saved){
   if(!saved)return true;
-  return JSON.stringify(working.items)!==JSON.stringify(saved.items)||working.name!==saved.name;
+  const workingAuto=working.autoAdvance!==false;
+  const savedAuto=saved.autoAdvance!==false;
+  return JSON.stringify(working.items)!==JSON.stringify(saved.items)||working.name!==saved.name||workingAuto!==savedAuto;
 }
 export function totalDurationSeconds(set,songsById){
   return set.items.reduce((total,item)=>{

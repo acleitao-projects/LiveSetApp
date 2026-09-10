@@ -34,7 +34,7 @@ export function newSong(input={}){
 
 export function newSetlist(name='New Set List'){
   const now=new Date().toISOString();
-  return {id:uid(),schemaVersion:SCHEMA_VERSION,name,items:[],createdAt:now,updatedAt:now};
+  return {id:uid(),schemaVersion:SCHEMA_VERSION,name,items:[],autoAdvance:true,createdAt:now,updatedAt:now};
 }
 
 export const trackItem=songId=>({id:uid(),type:'track',songId});

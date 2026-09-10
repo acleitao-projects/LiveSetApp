@@ -2,22 +2,22 @@
 // changes. Bump BUILD (and search-replace ?v=NN across app-v2.js, song-service.js,
 // backup-service.js, and settings-service.js) whenever ANY internal module changes.
 // Skipping this bump is what causes stale-icon / stale-module bugs after deploys.
-const BUILD='37';
-import {repository,storageCapabilities,storageEstimate} from './storage.js?v=37';
-import {newSetlist,trackItem,breakItem,uid} from './models.js?v=37';
-import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=37';
-import {AudioEngine} from './audio.js?v=37';
-import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveAudioPitch,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=37';
-import {parseCifra} from './cifra.js?v=37';
-import {chordDiagramSvg} from './chords.js?v=37';
-import {advanceCifraScroll} from './cifra-scroll.js?v=37';
-import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=37';
-import {icon} from './icons.js?v=37';
-import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=37';
-import {searchCifraClub,fetchCifraFromUrl} from './cifraclub-import.js?v=37';
-import {track,trackBoot,trackView} from './analytics.js?v=37';
-import {loadSettings,saveSetting,clampFontScale,pitchRatioFromSemitones,PITCH_MAX_SEMITONES} from './settings-service.js?v=37';
-import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=37';
+const BUILD='38';
+import {repository,storageCapabilities,storageEstimate} from './storage.js?v=38';
+import {newSetlist,trackItem,breakItem,uid} from './models.js?v=38';
+import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=38';
+import {AudioEngine} from './audio.js?v=38';
+import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveAudioPitch,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=38';
+import {parseCifra} from './cifra.js?v=38';
+import {chordDiagramSvg} from './chords.js?v=38';
+import {advanceCifraScroll} from './cifra-scroll.js?v=38';
+import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=38';
+import {icon} from './icons.js?v=38';
+import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=38';
+import {searchCifraClub,fetchCifraFromUrl,cleanClipboardCifra} from './cifraclub-import.js?v=38';
+import {track,trackBoot,trackView} from './analytics.js?v=38';
+import {loadSettings,saveSetting,clampFontScale,pitchRatioFromSemitones,PITCH_MAX_SEMITONES} from './settings-service.js?v=38';
+import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=38';
 
 const app=document.querySelector('#app');
 const engine=new AudioEngine();
@@ -56,6 +56,14 @@ let backupInputEl=null;
 let shareInputEl=null;
 let swRegistration=null;
 let reloadingForUpdate=false;
+let breakTimer=null;      // {itemId,endsAt}
+let breakIntervalId=0;
+let undoStack=[];         // stack of previous working.items snapshots
+let redoStack=[];
+let songPickerOpen=false;
+let songPickerQuery='';
+let dragState=null;       // pointer-driven set list reorder in progress
+let dragScrollRaf=0;
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtTime=s=>Number.isFinite(s)?`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`:'0:00';
@@ -95,6 +103,7 @@ function setStatus(msg,error=false){
 // ---------- Rendering ----------
 
 function render(){
+  if(dragState)return; // a pointer reorder is live-editing the drawer DOM directly; endDrag() re-renders once it settles
   const song=activeSong();
   const currentSongId=song?.id||null;
   const songChanged=currentSongId!==lastRenderedSongId;
@@ -121,11 +130,13 @@ function render(){
     ${!fullscreen?renderTopbar():''}
     ${!fullscreen?renderSongHeader(song,nextSong,nextItem):''}
     <main class="stage">
+      ${activeBreak?renderBreakScreen(activeBreak):`
       <div class="performance-body">
         ${transposed?renderChordRail(transposed,'left'):'<div></div>'}
         ${renderCifra(song,transposed)}
         ${transposed?renderChordRail(transposed,'right'):'<div></div>'}
       </div>
+      `}
       ${''/* rails share the full uniqueChords list; on wide screens each becomes a 2-col grid so all chords are visible on both sides */}
     </main>
     ${!fullscreen?renderControlStrip(song):''}
@@ -133,6 +144,7 @@ function render(){
     ${drawerOpen?renderDrawer():''}
     ${editSheet?renderEditSheet():''}
     ${cifraClubSearch?renderCifraClubModal():''}
+    ${songPickerOpen?renderSongPickerModal():''}
     ${newSetModalOpen?renderNewSetModal():''}
     ${settingsSheetOpen?renderSettingsSheet():''}
     ${onboardingStep!==null?renderOnboarding():''}
@@ -196,6 +208,15 @@ function renderCifra(song,parsed){
     return `<div class="cifra-row cifra-${line.type}"><pre>${esc(line.text)}</pre></div>`;
   }).join('');
   return `<section class="cifra-scroll" id="cifraScroll" tabindex="0">${rows}</section>`;
+}
+
+function renderBreakScreen(item){
+  const remaining=breakRemainingSeconds();
+  return `<div class="break-screen">
+    <div class="break-label">${esc(item.label||t('break'))}</div>
+    <div class="break-countdown${remaining<=0?' zero':''}" id="breakCountdown">${fmtTime(remaining)}</div>
+    <p class="break-hint">${esc(t('break_continue'))}</p>
+  </div>`;
 }
 
 function renderBigTransport(){
@@ -273,11 +294,23 @@ function renderDrawer(){
   const lang=getLanguage();
   const showInstall=!installed&&(installPrompt||(/iPad|iPhone|iPod/.test(navigator.userAgent)&&!matchMedia('(display-mode: standalone)').matches));
   const anim=render.drawerAnim||'';
+  const autoAdvanceOn=working.autoAdvance!==false;
   return `<div class="drawer-scrim${anim}" id="drawerScrim"></div>
   <aside class="drawer${anim}">
     <div class="drawer-head">
       <h2>${esc(t('set_list'))}</h2>
       <button class="btn icon ghost" id="closeDrawer" aria-label="${esc(t('close_set_list'))}">${icon('close')}</button>
+    </div>
+    <div class="drawer-controls">
+      <label class="auto-advance-toggle" title="${esc(t('auto_advance_hint'))}">
+        <input type="checkbox" id="autoAdvanceToggle" ${autoAdvanceOn?'checked':''}>
+        <span class="track"><i></i></span>
+        <span>${esc(t('auto_advance'))}</span>
+      </label>
+      <div class="undo-redo-group" role="group" aria-label="${esc(t('undo_redo_aria'))}">
+        <button class="icon-btn" id="undoAction" ${undoStack.length?'':'disabled'} aria-label="${esc(t('undo'))}" title="${esc(t('undo'))}">${icon('undo')}</button>
+        <button class="icon-btn" id="redoAction" ${redoStack.length?'':'disabled'} aria-label="${esc(t('redo'))}" title="${esc(t('redo'))}">${icon('redo')}</button>
+      </div>
     </div>
     <div class="toolbar">
       <button class="btn small" id="newSet">${icon('plus')}${esc(t('new'))}</button>
@@ -298,7 +331,7 @@ function renderDrawer(){
     </div>
     <div class="drawer-actions secondary">
       <button class="btn small" id="duplicateSet" title="${esc(t('duplicate_setlist'))}">${icon('copy')}${esc(t('duplicate'))}</button>
-      <button class="btn small" id="shareSet" title="${esc(t('share_setlist'))}">${icon('share')}${esc(t('share'))}</button>
+      <button class="btn small" id="shareSet" title="${esc(navigator.share?t('share_setlist_native'):t('share_setlist'))}">${icon('share')}${esc(t('share'))}</button>
       <button class="btn small" id="importShare" title="${esc(t('import_setlist_share'))}">${icon('upload')}${esc(t('import_share'))}</button>
     </div>
     <div class="drawer-foot">
@@ -325,7 +358,7 @@ function renderTrackRow(item,index){
   const song=songById(item.songId);
   const isActive=engine.session?.originatingSetlistItemId===item.id||activeBreak?.id===item.id;
   const trackNum=String(working.items.slice(0,index+1).filter(i=>i.type==='track').length).padStart(2,'0');
-  return `<div class="row track ${isActive?'active':''}" draggable="true" data-id="${item.id}" data-play="${item.id}">
+  return `<div class="row track ${isActive?'active':''}" data-id="${item.id}" data-play="${item.id}">
     <button class="drag" aria-label="${esc(t('drag_to_reorder'))}">${icon('drag')}</button>
     <span class="num">${trackNum}</span>
     <div class="body">
@@ -338,7 +371,7 @@ function renderTrackRow(item,index){
 }
 
 function renderBreakRow(item){
-  return `<div class="row break" draggable="true" data-id="${item.id}">
+  return `<div class="row break" data-id="${item.id}">
     <button class="drag" aria-label="${esc(t('drag_to_reorder'))}">${icon('drag')}</button>
     <span class="ic">${icon('coffee')}</span>
     <span class="label">${esc(item.label||t('break'))}</span>
@@ -367,6 +400,7 @@ function renderEditSheet(){
         <label for="editCifra">${esc(t('cifra'))}
           <span class="cifra-import-actions">
             <button class="btn small" id="importCifraClub" hidden>${icon('music')}${esc(t('import_cifraclub'))}</button>
+            <button class="btn small" id="importClipboard">${icon('clipboard')}${esc(t('paste_from_clipboard'))}</button>
             <button class="btn small" id="importCifra">${icon('file')}${esc(t('import_txt_cho'))}</button>
           </span>
         </label>
@@ -465,6 +499,29 @@ function renderCifraClubModal(){
   </div>`;
 }
 
+function songPickerResultsHtml(){
+  const q=songPickerQuery.trim().toLowerCase();
+  const list=songs
+    .filter(s=>!q||s.title.toLowerCase().includes(q)||(s.artist||'').toLowerCase().includes(q)||(s.originalFilename||'').toLowerCase().includes(q))
+    .sort((a,b)=>a.title.localeCompare(b.title));
+  const items=list.map(s=>`<button type="button" class="cc-result" data-pick-song="${s.id}"><strong>${esc(s.title)}</strong><small>${esc(s.artist||s.originalFilename||t('unknown'))}</small></button>`).join('');
+  return items?`<div class="cc-results">${items}</div>`:`<p class="muted" style="margin-top:16px">${esc(t('no_matching_songs'))}</p>`;
+}
+
+function renderSongPickerModal(){
+  return `<div class="modal-scrim" id="songPickerScrim">
+    <div class="modal cc-modal" role="dialog" aria-modal="true">
+      <h2>${esc(t('add_song'))}</h2>
+      <div class="field"><label for="songPickerSearch">${esc(t('search_library'))}</label><input id="songPickerSearch" value="${esc(songPickerQuery)}" placeholder="${esc(t('search_library_placeholder'))}" autocomplete="off" autofocus></div>
+      <div class="modal-actions" style="margin-top:0">
+        <button class="btn" id="songPickerCancel">${esc(t('cancel'))}</button>
+        <button class="btn primary" id="songPickerNewFile">${icon('plus')}${esc(t('pick_new_file'))}</button>
+      </div>
+      <div id="songPickerResults">${songPickerResultsHtml()}</div>
+    </div>
+  </div>`;
+}
+
 function renderNewSetModal(){
   return `<div class="modal-scrim" id="newSetScrim">
     <div class="modal" role="dialog" aria-modal="true">
@@ -538,10 +595,40 @@ function updateChordHighlight(area){
   });
 }
 
+// ---------- Break countdown timer ----------
+// Ticks independently of render() so a full re-render (drawer toggles, status
+// messages, etc.) never resets the clock — it's driven purely by wall time.
+
+function breakRemainingSeconds(){
+  if(!activeBreak)return 0;
+  if(!breakTimer||breakTimer.itemId!==activeBreak.id)return Math.max(0,Math.round((activeBreak.durationMinutes||0)*60));
+  return Math.max(0,Math.round((breakTimer.endsAt-Date.now())/1000));
+}
+function stopBreakTimer(){
+  clearInterval(breakIntervalId);
+  breakIntervalId=0;
+  breakTimer=null;
+}
+function startBreakTimer(item){
+  stopBreakTimer();
+  breakTimer={itemId:item.id,endsAt:Date.now()+Math.max(0,item.durationMinutes||0)*60000};
+  breakIntervalId=setInterval(tickBreakTimer,250);
+  tickBreakTimer();
+}
+function tickBreakTimer(){
+  if(!activeBreak||!breakTimer){stopBreakTimer();return;}
+  const el=document.querySelector('#breakCountdown');
+  if(!el)return; // break screen not on-screen right now; interval keeps running cheaply
+  const remaining=breakRemainingSeconds();
+  el.textContent=fmtTime(remaining);
+  el.classList.toggle('zero',remaining<=0);
+}
+
 // ---------- Playback ----------
 
 async function enterBreak(item){
   activeBreak=item;
+  startBreakTimer(item);
   if(engine.session&&!engine.paused)await engine.toggle();
   track('enter_break',{minutes:item.durationMinutes});
   render();
@@ -554,6 +641,7 @@ async function playItemById(itemId){
   const song=songById(item.songId);
   if(!song){setStatus(t('song_missing_library'),true);render();return;}
   activeBreak=null;
+  stopBreakTimer();
   try{
     const url=await songUrl(song);
     const wasSameSong=engine.session?.songId===song.id;
@@ -577,7 +665,7 @@ async function playResolved(item){
 async function togglePlay(){
   if(activeBreak){
     const next=resolveNext(working,activeBreak.id,engine.session?.lastKnownOrder||[]);
-    if(next){activeBreak=null;return playResolved(next);}
+    if(next){activeBreak=null;stopBreakTimer();return playResolved(next);}
   }
   if(engine.session)await engine.toggle();
   else{
@@ -617,6 +705,7 @@ async function pickSongAndAppend(){
       if(!songs.find(s=>s.id===song.id))songs=[...songs,song];
       else songs=songs.map(s=>s.id===song.id?song:s);
     }
+    pushUndo();
     // Preserve list order: insert all consecutively after pendingInsertAfter
     let anchor=pendingInsertAfter;
     for(const song of picked){
@@ -632,6 +721,81 @@ async function pickSongAndAppend(){
   }catch(error){
     if(error?.name==='AbortError')return;
     setStatus(error.message||t('could_not_add'),true);
+    render();
+  }
+}
+
+// ---------- Undo / redo (add / remove / reorder only) ----------
+
+function pushUndo(){
+  undoStack.push(clone(working.items));
+  if(undoStack.length>50)undoStack.shift();
+  redoStack=[];
+}
+function resetUndoHistory(){undoStack=[];redoStack=[];}
+function undoSetlistAction(){
+  if(!undoStack.length)return;
+  redoStack.push(clone(working.items));
+  working.items=undoStack.pop();
+  engine.updateLastKnownOrder(workingItemIds());
+  setStatus(t('undo_done'));
+  track('undo_setlist_action');
+  render();
+}
+function redoSetlistAction(){
+  if(!redoStack.length)return;
+  undoStack.push(clone(working.items));
+  working.items=redoStack.pop();
+  engine.updateLastKnownOrder(workingItemIds());
+  setStatus(t('redo_done'));
+  track('redo_setlist_action');
+  render();
+}
+
+// ---------- Song picker (search library before falling back to a file) ----------
+
+function openSongPicker(){
+  if(!songs.length)return pickSongAndAppend();
+  songPickerOpen=true;songPickerQuery='';
+  track('song_picker_open');
+  render();
+}
+function closeSongPicker(){songPickerOpen=false;render();}
+function appendExistingSong(songId){
+  const song=songById(songId);
+  if(!song)return;
+  pushUndo();
+  const item=trackItem(song.id);
+  if(pendingInsertAfter)insertAfter(working,pendingInsertAfter,item);
+  else appendTrack(working,song.id);
+  pendingInsertAfter=null;
+  engine.updateLastKnownOrder(workingItemIds());
+  songPickerOpen=false;
+  setStatus(t('added_song',{title:song.title}));
+  track('add_from_library');
+  render();
+}
+
+// ---------- Clipboard cifra import ----------
+
+async function pasteCifraFromClipboard(){
+  if(!editSheet)return;
+  try{
+    if(!navigator.clipboard?.readText)throw Error('clipboard_unsupported');
+    const raw=await navigator.clipboard.readText();
+    if(!raw||!raw.trim())throw Error('clipboard_empty');
+    if(editSheet.cifra&&editSheet.cifra.trim()&&!confirm(t('cifraclub_replace_confirm')))return;
+    editSheet.cifra=cleanClipboardCifra(raw);
+    setStatus(t('clipboard_import_ok'));
+    track('import_cifra_clipboard_success',{length:editSheet.cifra.length});
+    render();
+  }catch(error){
+    const key=error?.message==='clipboard_unsupported'?'clipboard_unsupported'
+      :error?.message==='clipboard_empty'?'clipboard_empty'
+      :error?.name==='NotAllowedError'?'clipboard_denied'
+      :'clipboard_failed';
+    setStatus(t(key),true);
+    track('import_cifra_clipboard_error',{code:key});
     render();
   }
 }
@@ -700,6 +864,7 @@ async function runDuplicateSet(){
   await repository.setlists.put(copy);
   sets=[...sets.filter(s=>s.id!==copy.id),clone(copy)];
   working=clone(copy);saved=clone(copy);
+  resetUndoHistory();
   engine.updateLastKnownOrder(workingItemIds());
   setStatus(t('setlist_duplicated',{name:copy.name}));
   track('duplicate_setlist');
@@ -717,8 +882,21 @@ async function runShareSet(){
   try{
     const share=shareSetlist(working,songs);
     const filename=`${(working.name||'setlist').replace(/[^\w-]+/g,'_')}.setlist.json`;
-    downloadBlob(setlistBlob(share),filename);
-    setStatus(t('setlist_shared'));track('share_setlist',{tracks:share.songs.length});
+    const blob=setlistBlob(share);
+    if(navigator.share){
+      try{
+        const file=new File([blob],filename,{type:'application/json'});
+        const shareData=navigator.canShare?.({files:[file]})?{files:[file],title:working.name,text:t('share_setlist_text',{name:working.name})}:{title:working.name,text:t('share_setlist_text',{name:working.name})};
+        await navigator.share(shareData);
+        setStatus(t('setlist_shared'));track('share_setlist',{tracks:share.songs.length,method:'web_share'});
+        return;
+      }catch(shareError){
+        if(shareError?.name==='AbortError')return; // user dismissed the share sheet
+        // Unsupported payload or share failed — fall through to the download.
+      }
+    }
+    downloadBlob(blob,filename);
+    setStatus(t('setlist_shared'));track('share_setlist',{tracks:share.songs.length,method:'download'});
   }catch(error){setStatus(error.message||t('share_failed'),true);render();}
 }
 
@@ -745,6 +923,7 @@ async function handleShareImport(){
     sets=await repository.setlists.all();
     songs=await listSongs();
     working=clone(setlist);saved=clone(setlist);
+    resetUndoHistory();
     setStatus(t('share_imported',{count:imported}));
     track('import_share',{songs:imported});
     render();
@@ -784,6 +963,7 @@ async function handleBackupImport(){
     const restoredSettings=await loadSettings();
     fontScale=restoredSettings.fontScale;applyFontScale();
     if(sets[0]){saved=clone(sets[0]);working=clone(sets[0]);}
+    resetUndoHistory();
     setStatus(t('backup_restored',{songs:summary.songs,setlists:summary.setlists,files:summary.files}));
     track('backup_import',{songs:summary.songs,setlists:summary.setlists,files:summary.files});
     render();
@@ -869,6 +1049,7 @@ app.addEventListener('click',async event=>{
   if(target.id==='newSetScrim'){newSetModalOpen=false;return render();}
   if(target.id==='ccScrim'){cifraClubSearch=null;return render();}
   if(target.id==='settingsScrim'){settingsSheetOpen=false;return render();}
+  if(target.id==='songPickerScrim'){return closeSongPicker();}
 
   // Language chip
   const langBtn=target.closest('.lang-chip[data-lang]');
@@ -952,6 +1133,7 @@ app.addEventListener('click',async event=>{
       const name=document.querySelector('#newSetName')?.value.trim()||'New set list';
       if(isDirty(working,saved)&&!confirm(t('discard_confirm')))return;
       working=newSetlist(name||t('default_new_set_name'));saved=null;newSetModalOpen=false;drawerOpen=true;
+      resetUndoHistory();
       track('new_setlist_created');
       return render();
     }
@@ -965,8 +1147,12 @@ app.addEventListener('click',async event=>{
       return render();
     }
 
-    if(btn.id==='addSong'){pendingInsertAfter=null;return pickSongAndAppend();}
-    if(btn.id==='addBreak'){addBreak(working);engine.updateLastKnownOrder(workingItemIds());track('add_break');return render();}
+    if(btn.id==='addSong'){pendingInsertAfter=null;return openSongPicker();}
+    if(btn.id==='songPickerCancel'){return closeSongPicker();}
+    if(btn.id==='songPickerNewFile'){songPickerOpen=false;return pickSongAndAppend();}
+    if(btn.id==='undoAction'){return undoSetlistAction();}
+    if(btn.id==='redoAction'){return redoSetlistAction();}
+    if(btn.id==='addBreak'){pushUndo();addBreak(working);engine.updateLastKnownOrder(workingItemIds());track('add_break');return render();}
 
     const editId=target.closest('[data-edit-song]')?.dataset.editSong;
     if(editId){track('open_edit_sheet');return openEditSheet(editId);}
@@ -974,6 +1160,7 @@ app.addEventListener('click',async event=>{
     const removeId=target.closest('[data-remove]')?.dataset.remove;
     if(removeId){
       const item=working.items.find(i=>i.id===removeId);
+      pushUndo();
       track('remove_item',{type:item?.type||'unknown'});
       removeItem(working,removeId);engine.updateLastKnownOrder(workingItemIds());return render();
     }
@@ -981,11 +1168,14 @@ app.addEventListener('click',async event=>{
     if(btn.id==='closeSheet'||btn.id==='cancelSheet'){editSheet=null;return render();}
     if(btn.id==='saveSheet')return saveEditSheet();
     if(btn.id==='importCifra'){track('import_cifra_file_click');document.querySelector('#cifraFile')?.click();return;}
+    if(btn.id==='importClipboard'){track('import_cifra_clipboard_click');await pasteCifraFromClipboard();return;}
     if(btn.id==='importCifraClub'){track('cifraclub_open');openCifraClubSearch();return;}
     if(btn.id==='ccCancel'){cifraClubSearch=null;return render();}
     if(btn.id==='ccSearch'){await runCifraClubSearch();return;}
     const ccResult=target.closest('.cc-result[data-cc-url]');
     if(ccResult){track('cifraclub_pick_result');await pickCifraClubResult(ccResult.dataset.ccUrl);return;}
+    const pickSongEl=target.closest('.cc-result[data-pick-song]');
+    if(pickSongEl){track('song_picker_pick');appendExistingSong(pickSongEl.dataset.pickSong);return;}
 
     if(btn.classList?.contains('chord-card')){
       // No behavior for now; kept as future hook (chord tap → jump / diagram detail)
@@ -1004,12 +1194,23 @@ app.addEventListener('change',async event=>{
       if(!el.value)return;
       if(isDirty(working,saved)&&!confirm(t('discard_confirm')))return render();
       const selected=sets.find(s=>s.id===el.value);
-      if(selected){working=clone(selected);saved=clone(selected);engine.updateLastKnownOrder(workingItemIds());track('open_setlist');render();}
+      if(selected){working=clone(selected);saved=clone(selected);resetUndoHistory();engine.updateLastKnownOrder(workingItemIds());track('open_setlist');render();}
       return;
     }
     if(el.dataset.breakDur){
       const item=working.items.find(i=>i.id===el.dataset.breakDur);
-      if(item){item.durationMinutes=Math.max(1,Math.min(240,Number(el.value)||15));track('break_duration_edit',{minutes:item.durationMinutes});render();}
+      if(item){
+        item.durationMinutes=Math.max(1,Math.min(240,Number(el.value)||15));
+        track('break_duration_edit',{minutes:item.durationMinutes});
+        if(activeBreak?.id===item.id)startBreakTimer(item);
+        render();
+      }
+      return;
+    }
+    if(el.id==='autoAdvanceToggle'){
+      working.autoAdvance=el.checked;
+      track('auto_advance_toggle',{enabled:el.checked});
+      render();
       return;
     }
     if(el.id==='autoScroll'){
@@ -1049,6 +1250,12 @@ app.addEventListener('input',event=>{
     if(song){song.cifraScrollSpeed=v;}
     return;
   }
+  if(el.id==='songPickerSearch'){
+    songPickerQuery=el.value;
+    const results=document.querySelector('#songPickerResults');
+    if(results)results.innerHTML=songPickerResultsHtml();
+    return;
+  }
   if(el.id==='editTitle'){editSheet.title=el.value;return;}
   if(el.id==='editArtist'){editSheet.artist=el.value;return;}
   if(el.id==='editNotes'){editSheet.notes=el.value;return;}
@@ -1058,31 +1265,124 @@ app.addEventListener('input',event=>{
 // Suppress the OS context menu on setlist rows (Android long-press callout,
 // desktop right-click) so long-press-to-drag stays clean.
 app.addEventListener('contextmenu',event=>{
-  if(event.target.closest('.row[draggable="true"], .row .drag'))event.preventDefault();
+  if(event.target.closest('.row[data-id]'))event.preventDefault();
 });
 
-// Drag & drop reorder within the drawer
-let dragId=null;
-app.addEventListener('dragstart',event=>{
-  const row=event.target.closest('.row[draggable="true"]');
-  if(!row)return;
-  dragId=row.dataset.id;
-  event.dataTransfer.effectAllowed='move';
-});
-app.addEventListener('dragover',event=>{
-  if(!event.target.closest('.row[draggable="true"]'))return;
-  event.preventDefault();
-});
-app.addEventListener('drop',event=>{
-  const row=event.target.closest('.row[draggable="true"]');
-  if(!row||!dragId)return;
-  event.preventDefault();
-  const targetIndex=working.items.findIndex(i=>i.id===row.dataset.id);
-  moveItem(working,dragId,targetIndex);
-  dragId=null;
-  engine.updateLastKnownOrder(workingItemIds());
-  track('reorder_item');
+// ---------- Reorder via Pointer Events ----------
+// One implementation for mouse, touch, and pen — replaces the old HTML5
+// draggable/dragstart/dragover/drop trio, which was flaky on iOS Safari and
+// merely serviceable on Android. Drag starts only from the grip handle so it
+// never fights row-tap-to-play. The dragged row tracks the pointer with a CSS
+// transform; siblings are physically reordered in the DOM as soon as the
+// pointer crosses their midpoint, then render() reconciles everything against
+// `working.items` once the gesture ends.
+
+function dragNaturalTop(rowEl){
+  const prevTransform=rowEl.style.transform;
+  rowEl.style.transform='none';
+  const top=rowEl.getBoundingClientRect().top;
+  rowEl.style.transform=prevTransform;
+  return top;
+}
+function applyDragTransform(){
+  if(!dragState)return;
+  const naturalTop=dragNaturalTop(dragState.rowEl);
+  dragState.rowEl.style.transform=`translateY(${dragState.targetTop-naturalTop}px)`;
+}
+function checkDragReorder(){
+  if(!dragState)return;
+  const {rowEl,list,targetTop}=dragState;
+  const height=rowEl.getBoundingClientRect().height;
+  const draggedCenter=targetTop+height/2;
+  const siblings=[...list.querySelectorAll('.row[data-id]')].filter(el=>el!==rowEl);
+  let insertBefore=null;
+  for(const sib of siblings){
+    const r=sib.getBoundingClientRect();
+    if(draggedCenter<r.top+r.height/2){insertBefore=sib;break;}
+  }
+  if(insertBefore){
+    if(rowEl.nextElementSibling!==insertBefore){list.insertBefore(rowEl,insertBefore);applyDragTransform();}
+  }else if(list.lastElementChild!==rowEl){
+    list.appendChild(rowEl);applyDragTransform();
+  }
+}
+function dragAutoScrollTick(){
+  if(!dragState){dragScrollRaf=0;return;}
+  const {list,lastPointerY}=dragState;
+  const rect=list.getBoundingClientRect();
+  const edge=48,maxSpeed=16;
+  let dy=0;
+  if(lastPointerY<rect.top+edge)dy=-maxSpeed*(1-Math.max(0,lastPointerY-rect.top)/edge);
+  else if(lastPointerY>rect.bottom-edge)dy=maxSpeed*(1-Math.max(0,rect.bottom-lastPointerY)/edge);
+  if(dy){
+    // targetTop is a viewport-space coordinate (tracks the pointer 1:1), so it
+    // stays correct as-is; scrolling only moves the natural position we diff against.
+    list.scrollTop+=dy;
+    applyDragTransform();
+    checkDragReorder();
+  }
+  dragScrollRaf=requestAnimationFrame(dragAutoScrollTick);
+}
+function endDrag(commit){
+  if(!dragState)return;
+  const {rowEl,list,id,originalIndex}=dragState;
+  cancelAnimationFrame(dragScrollRaf);dragScrollRaf=0;
+  rowEl.style.transform='';
+  rowEl.classList.remove('dragging');
+  document.body.classList.remove('dragging-row');
+  if(commit){
+    const finalOrder=[...list.querySelectorAll('.row[data-id]')].map(el=>el.dataset.id);
+    const newIndex=finalOrder.indexOf(id);
+    if(newIndex>=0&&newIndex!==originalIndex){
+      pushUndo();
+      moveItem(working,id,newIndex);
+      engine.updateLastKnownOrder(workingItemIds());
+      track('reorder_item',{via:'pointer'});
+    }
+  }
+  dragState=null;
   render();
+}
+app.addEventListener('pointerdown',event=>{
+  if(event.button!=null&&event.button!==0)return; // left click / primary touch only
+  const handle=event.target.closest('.drag');
+  if(!handle)return;
+  const row=handle.closest('.row[data-id]');
+  const list=row?.closest('.drawer-list');
+  if(!row||!list)return;
+  event.preventDefault();
+  const rows=[...list.querySelectorAll('.row[data-id]')];
+  dragState={
+    pointerId:event.pointerId,
+    id:row.dataset.id,
+    rowEl:row,
+    list,
+    originalIndex:rows.indexOf(row),
+    initialRowTop:row.getBoundingClientRect().top,
+    initialPointerY:event.clientY,
+    lastPointerY:event.clientY,
+    targetTop:row.getBoundingClientRect().top
+  };
+  try{row.setPointerCapture(event.pointerId);}catch(_){/* ignore */}
+  row.classList.add('dragging');
+  document.body.classList.add('dragging-row');
+  dragScrollRaf=requestAnimationFrame(dragAutoScrollTick);
+});
+app.addEventListener('pointermove',event=>{
+  if(!dragState||event.pointerId!==dragState.pointerId)return;
+  event.preventDefault();
+  dragState.lastPointerY=event.clientY;
+  dragState.targetTop=dragState.initialRowTop+(event.clientY-dragState.initialPointerY);
+  applyDragTransform();
+  checkDragReorder();
+});
+app.addEventListener('pointerup',event=>{
+  if(!dragState||event.pointerId!==dragState.pointerId)return;
+  endDrag(true);
+});
+app.addEventListener('pointercancel',event=>{
+  if(!dragState||event.pointerId!==dragState.pointerId)return;
+  endDrag(false);
 });
 
 // Seek bar click
@@ -1106,9 +1406,15 @@ document.addEventListener('keydown',event=>{
     event.preventDefault();
     togglePlay();
   }
+  if((event.ctrlKey||event.metaKey)&&!/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)){
+    const key=event.key.toLowerCase();
+    if(key==='z'){event.preventDefault();return event.shiftKey?redoSetlistAction():undoSetlistAction();}
+    if(key==='y'){event.preventDefault();return redoSetlistAction();}
+  }
   if(event.key==='Escape'){
     if(onboardingStep!==null)return; // onboarding is intentional; use Skip
     if(settingsSheetOpen){settingsSheetOpen=false;return render();}
+    if(songPickerOpen){songPickerOpen=false;return render();}
     if(cifraClubSearch){cifraClubSearch=null;return render();}
     if(editSheet){editSheet=null;return render();}
     if(newSetModalOpen){newSetModalOpen=false;return render();}
@@ -1159,8 +1465,11 @@ engine.addEventListener('state',()=>{
 });
 engine.addEventListener('ended',()=>{
   const next=resolveNext(working,engine.session?.originatingSetlistItemId,engine.session?.lastKnownOrder||[]);
-  if(next?.type==='track')playItemById(next.id);
-  else if(next?.type==='break'){activeBreak=next;render();}
+  if(next?.type==='track'){
+    if(working.autoAdvance!==false)playItemById(next.id);
+    else render(); // manual chaining: stay put, "Next" chip is ready for the user
+  }
+  else if(next?.type==='break'){activeBreak=next;startBreakTimer(next);render();}
   else render();
 });
 
@@ -1195,7 +1504,7 @@ async function boot(){
   render();
   if('serviceWorker'in navigator){
     try{
-      swRegistration=await navigator.serviceWorker.register('./sw.js?v=17');
+      swRegistration=await navigator.serviceWorker.register('./sw.js?v=18');
       // A new SW is already waiting (installed on a previous visit but never activated)
       if(swRegistration.waiting&&navigator.serviceWorker.controller){updateAvailable=true;render();}
       swRegistration.addEventListener('updatefound',()=>{

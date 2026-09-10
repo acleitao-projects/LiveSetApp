@@ -1,4 +1,4 @@
-const CACHE='liveset-shell-v57';
+const CACHE='liveset-shell-v58';
 const SHELL=[
   './',
   './index.html',

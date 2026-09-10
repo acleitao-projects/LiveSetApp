@@ -11,6 +11,15 @@
 .next-chip .label{text-transform:uppercase;letter-spacing:.08em;font-size:11px}
 .next-chip strong{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
 
+/* Break screen: big centered countdown, replaces cifra + rails while a break is active */
+.break-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:20px;text-align:center;min-height:0}
+.break-screen .break-label{font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.break-screen .break-countdown{font-family:var(--mono);font-size:clamp(64px,14vw,148px);font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent);line-height:1;letter-spacing:-.02em}
+.break-screen .break-countdown.zero{color:var(--danger);animation:breakPulse 1.1s ease-in-out infinite}
+.break-screen .break-hint{color:var(--muted);font-size:14px;margin:0}
+@keyframes breakPulse{0%,100%{opacity:1}50%{opacity:.5}}
+@media (max-width:640px){.break-screen{gap:12px}}
+
 /* Cifra + rails: lyrics stay centered with a capped column; rails auto-fill compact diagram cards */
 .performance-body{flex:1;display:grid;grid-template-columns:minmax(96px,1fr) minmax(0,760px) minmax(96px,1fr);gap:14px;padding:0 20px 8px;overflow:hidden;min-height:0;justify-content:center}
 .chord-rail{overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px;padding:4px 0 24px;scrollbar-width:none;align-content:start;justify-items:center}
