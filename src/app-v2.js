@@ -2,22 +2,22 @@
 // changes. Bump BUILD (and search-replace ?v=NN across app-v2.js, song-service.js,
 // backup-service.js, and settings-service.js) whenever ANY internal module changes.
 // Skipping this bump is what causes stale-icon / stale-module bugs after deploys.
-const BUILD='39';
-import {repository,storageCapabilities,storageEstimate} from './storage.js?v=39';
-import {newSetlist,trackItem,breakItem,uid} from './models.js?v=39';
-import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=39';
-import {AudioEngine} from './audio.js?v=39';
-import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveAudioPitch,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=39';
-import {parseCifra} from './cifra.js?v=39';
-import {chordDiagramSvg} from './chords.js?v=39';
-import {advanceCifraScroll} from './cifra-scroll.js?v=39';
-import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=39';
-import {icon} from './icons.js?v=39';
-import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=39';
-import {searchCifraClub,fetchCifraFromUrl,cleanClipboardCifra} from './cifraclub-import.js?v=39';
-import {track,trackBoot,trackView} from './analytics.js?v=39';
-import {loadSettings,saveSetting,clampFontScale,pitchRatioFromSemitones,PITCH_MAX_SEMITONES} from './settings-service.js?v=39';
-import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=39';
+const BUILD='40';
+import {repository,storageCapabilities,storageEstimate} from './storage.js?v=40';
+import {newSetlist,trackItem,breakItem,uid} from './models.js?v=40';
+import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=40';
+import {AudioEngine} from './audio.js?v=40';
+import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveAudioPitch,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=40';
+import {parseCifra} from './cifra.js?v=40';
+import {chordDiagramSvg} from './chords.js?v=40';
+import {advanceCifraScroll} from './cifra-scroll.js?v=40';
+import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=40';
+import {icon} from './icons.js?v=40';
+import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=40';
+import {searchCifraClub,fetchCifraFromUrl,cleanClipboardCifra} from './cifraclub-import.js?v=40';
+import {track,trackBoot,trackView} from './analytics.js?v=40';
+import {loadSettings,saveSetting,clampFontScale,pitchRatioFromSemitones,PITCH_MAX_SEMITONES} from './settings-service.js?v=40';
+import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=40';
 
 const app=document.querySelector('#app');
 const engine=new AudioEngine();
@@ -51,6 +51,7 @@ let previousDrawerOpen=false;
 let previousEditSheet=false;
 let previousSettingsOpen=false;
 let fontScale=1.0;
+let muted=false;
 let wakeLockSentinel=null;
 let backupInputEl=null;
 let shareInputEl=null;
@@ -264,6 +265,7 @@ function renderControlStrip(song){
         <button id="transposeUp" ${song?'':'disabled'} aria-label="${esc(t('transpose_up'))}">+</button>
       </div>
       ${renderAudioPitch(song)}
+      <button class="tp-btn mute-btn ${muted?'active':''}" id="muteToggle" aria-pressed="${muted}" aria-label="${esc(muted?t('unmute'):t('mute'))}" title="${esc(muted?t('unmute'):t('mute'))}">${icon(muted?'volumeX':'volume')}</button>
     </div>
     <div class="control-group transport">
       <button class="tp-btn" id="prev" aria-label="${esc(t('previous_song'))}">${icon('prev')}</button>
@@ -285,6 +287,7 @@ function renderControlStrip(song){
 function renderFullscreenControls(){
   const paused=engine.paused||!engine.session;
   return `<button class="fs-exit" id="fullscreenExit" aria-label="${esc(t('exit_fullscreen'))}">${icon('fullscreenExit')}</button>
+    <button class="fs-mute ${muted?'active':''}" id="muteToggle" aria-pressed="${muted}" aria-label="${esc(muted?t('unmute'):t('mute'))}" title="${esc(muted?t('unmute'):t('mute'))}">${icon(muted?'volumeX':'volume')}</button>
     <button class="fs-play" id="playPause" aria-label="${esc(paused?t('play'):t('pause'))}">${paused?icon('play'):icon('pause')}</button>`;
 }
 
@@ -1121,6 +1124,13 @@ app.addEventListener('click',async event=>{
     if(btn.id==='next'||btn.id==='playNext'){track('transport_next',{via:btn.id==='playNext'?'chip':'button'});const item=resolveNext(working,activeBreak?.id||engine.session?.originatingSetlistItemId,engine.session?.lastKnownOrder||[]);if(item)await playResolved(item);return;}
     if(btn.id==='rew'){track('transport_rewind');return engine.seek(-10);}
     if(btn.id==='fwd'){track('transport_forward');return engine.seek(10);}
+    if(btn.id==='muteToggle'){
+      muted=!muted;
+      engine.setMuted(muted);
+      await saveSetting('muted',muted);
+      track('mute_toggle',{muted});
+      return render();
+    }
 
     if(btn.id==='transposeDown'){track('transpose_change',{delta:-1});return persistTranspose(-1);}
     if(btn.id==='transposeUp'){track('transpose_change',{delta:1});return persistTranspose(1);}
@@ -1483,6 +1493,8 @@ async function boot(){
     const settings=await loadSettings();
     fontScale=clampFontScale(settings.fontScale);
     applyFontScale();
+    muted=!!settings.muted;
+    engine.setMuted(muted);
     if(!settings.onboardingCompleted)onboardingStep=0;
     songs=await listSongs();
     sets=await repository.setlists.all();
@@ -1504,7 +1516,7 @@ async function boot(){
   render();
   if('serviceWorker'in navigator){
     try{
-      swRegistration=await navigator.serviceWorker.register('./sw.js?v=19');
+      swRegistration=await navigator.serviceWorker.register('./sw.js?v=20');
       // A new SW is already waiting (installed on a previous visit but never activated)
       if(swRegistration.waiting&&navigator.serviceWorker.controller){updateAvailable=true;render();}
       swRegistration.addEventListener('updatefound',()=>{
