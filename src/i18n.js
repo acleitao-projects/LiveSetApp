@@ -168,7 +168,31 @@ const DICTS = {
     onboard_install_title: 'Install for the stage',
     onboard_install_body: 'Install LiveSet as a real app so it opens instantly, runs offline, and stays out of your browser tabs during a gig.',
     onboard_install_body_ios: 'Add LiveSet to your Home Screen: tap Share, then Add to Home Screen. It runs instantly, offline, without the browser bar.',
-    more: 'More'
+    more: 'More',
+    // Auto-advance
+    auto_advance: 'Auto-advance',
+    auto_advance_hint: 'Chain to the next song automatically when one ends',
+    // Undo / redo
+    undo: 'Undo',
+    redo: 'Redo',
+    undo_redo_aria: 'Undo or redo the last set list change',
+    undo_done: 'Undone.',
+    redo_done: 'Redone.',
+    // Song search / library picker
+    search_library: 'Search your library',
+    search_library_placeholder: 'Search by title or artist…',
+    no_matching_songs: 'No songs match.',
+    pick_new_file: 'Pick new file…',
+    // Clipboard cifra import
+    paste_from_clipboard: 'Paste from clipboard',
+    clipboard_unsupported: 'Clipboard paste is not supported in this browser.',
+    clipboard_empty: 'Clipboard is empty.',
+    clipboard_denied: 'Clipboard access was denied.',
+    clipboard_failed: 'Could not read the clipboard.',
+    clipboard_import_ok: 'Pasted from clipboard.',
+    // Web Share
+    share_setlist_native: 'Share set list',
+    share_setlist_text: 'Set list: {name}'
   },
   pt: {
     ready: 'Pronto',
@@ -316,7 +340,31 @@ const DICTS = {
     onboard_install_title: 'Instale para o palco',
     onboard_install_body: 'Instale o LiveSet como um app de verdade — abre instantâneo, funciona offline e não fica preso nas abas do navegador durante o show.',
     onboard_install_body_ios: 'Adicione o LiveSet à Tela de Início: toque em Compartilhar e depois em Adicionar à Tela de Início. Abre instantâneo, offline, sem a barra do navegador.',
-    more: 'Mais'
+    more: 'Mais',
+    // Auto-advance
+    auto_advance: 'Avançar automático',
+    auto_advance_hint: 'Encadear para a próxima música automaticamente ao terminar',
+    // Undo / redo
+    undo: 'Desfazer',
+    redo: 'Refazer',
+    undo_redo_aria: 'Desfazer ou refazer a última alteração no repertório',
+    undo_done: 'Desfeito.',
+    redo_done: 'Refeito.',
+    // Song search / library picker
+    search_library: 'Buscar na biblioteca',
+    search_library_placeholder: 'Buscar por título ou artista…',
+    no_matching_songs: 'Nenhuma música encontrada.',
+    pick_new_file: 'Escolher novo arquivo…',
+    // Clipboard cifra import
+    paste_from_clipboard: 'Colar da área de transferência',
+    clipboard_unsupported: 'Colar da área de transferência não é compatível com este navegador.',
+    clipboard_empty: 'A área de transferência está vazia.',
+    clipboard_denied: 'Acesso à área de transferência negado.',
+    clipboard_failed: 'Não foi possível ler a área de transferência.',
+    clipboard_import_ok: 'Colado da área de transferência.',
+    // Web Share
+    share_setlist_native: 'Compartilhar repertório',
+    share_setlist_text: 'Repertório: {name}'
   }
 };
 

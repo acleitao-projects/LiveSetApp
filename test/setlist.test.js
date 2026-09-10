@@ -1,7 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newSetlist,trackItem,breakItem} from '../src/models.js';
-import {insertAfter,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from '../src/setlist.js';
+import {insertAfter,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration,isDirty,clone} from '../src/setlist.js';
+
+test('new set lists default to auto-advance on', () => {
+  assert.equal(newSetlist().autoAdvance, true);
+});
+
+test('isDirty treats an undefined autoAdvance as true (back-compat with older saves)', () => {
+  const saved = newSetlist();
+  delete saved.autoAdvance;
+  const working = clone(saved);
+  assert.equal(isDirty(working, saved), false);
+});
+
+test('isDirty flags a toggled autoAdvance the same as an item/name change', () => {
+  const saved = newSetlist();
+  const working = clone(saved);
+  working.autoAdvance = false;
+  assert.equal(isDirty(working, saved), true);
+});
 
 test('mutations and navigation use stable item ids', () => {
   const s = newSetlist();
