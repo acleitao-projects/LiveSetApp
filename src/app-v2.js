@@ -2,22 +2,22 @@
 // changes. Bump BUILD (and search-replace ?v=NN across app-v2.js, song-service.js,
 // backup-service.js, and settings-service.js) whenever ANY internal module changes.
 // Skipping this bump is what causes stale-icon / stale-module bugs after deploys.
-const BUILD='38';
-import {repository,storageCapabilities,storageEstimate} from './storage.js?v=38';
-import {newSetlist,trackItem,breakItem,uid} from './models.js?v=38';
-import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=38';
-import {AudioEngine} from './audio.js?v=38';
-import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveAudioPitch,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=38';
-import {parseCifra} from './cifra.js?v=38';
-import {chordDiagramSvg} from './chords.js?v=38';
-import {advanceCifraScroll} from './cifra-scroll.js?v=38';
-import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=38';
-import {icon} from './icons.js?v=38';
-import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=38';
-import {searchCifraClub,fetchCifraFromUrl,cleanClipboardCifra} from './cifraclub-import.js?v=38';
-import {track,trackBoot,trackView} from './analytics.js?v=38';
-import {loadSettings,saveSetting,clampFontScale,pitchRatioFromSemitones,PITCH_MAX_SEMITONES} from './settings-service.js?v=38';
-import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=38';
+const BUILD='39';
+import {repository,storageCapabilities,storageEstimate} from './storage.js?v=39';
+import {newSetlist,trackItem,breakItem,uid} from './models.js?v=39';
+import {clone,isDirty,insertAfter,appendTrack,addBreak,removeItem,moveItem,resolveNext,resolvePrevious,totalDurationSeconds,formatDuration} from './setlist.js?v=39';
+import {AudioEngine} from './audio.js?v=39';
+import {pickAndRegisterSong,pickAndRegisterSongs,registerFromInputFile,songUrl,listSongs,saveSongEdits,saveTranspose,saveAudioPitch,saveScrollSettings,getSong,audioAcceptString} from './song-service.js?v=39';
+import {parseCifra} from './cifra.js?v=39';
+import {chordDiagramSvg} from './chords.js?v=39';
+import {advanceCifraScroll} from './cifra-scroll.js?v=39';
+import {transposeChordLine,transposeChordSymbol} from './transpose.js?v=39';
+import {icon} from './icons.js?v=39';
+import {t,loadLanguage,setLanguage,getLanguage,supportedLanguages} from './i18n.js?v=39';
+import {searchCifraClub,fetchCifraFromUrl,cleanClipboardCifra} from './cifraclub-import.js?v=39';
+import {track,trackBoot,trackView} from './analytics.js?v=39';
+import {loadSettings,saveSetting,clampFontScale,pitchRatioFromSemitones,PITCH_MAX_SEMITONES} from './settings-service.js?v=39';
+import {createBackup,backupBlob,restoreBackup,shareSetlist,setlistBlob,importSetlistShare} from './backup-service.js?v=39';
 
 const app=document.querySelector('#app');
 const engine=new AudioEngine();
@@ -1504,7 +1504,7 @@ async function boot(){
   render();
   if('serviceWorker'in navigator){
     try{
-      swRegistration=await navigator.serviceWorker.register('./sw.js?v=18');
+      swRegistration=await navigator.serviceWorker.register('./sw.js?v=19');
       // A new SW is already waiting (installed on a previous visit but never activated)
       if(swRegistration.waiting&&navigator.serviceWorker.controller){updateAvailable=true;render();}
       swRegistration.addEventListener('updatefound',()=>{

@@ -105,9 +105,9 @@ export const importFromCifraClub = fetchCifraFromUrl;
 //
 // Copying a cifra straight off a Cifra Club (or similar) web page brings along
 // site chrome: version tabs, "Simplificar"/"Auto Rolagem" controls, tuning/capo
-// lines, ad placeholders, and stray ">>" markers used as visual separators in the
-// rendered page. This strips the common junk while leaving the actual chords +
-// lyrics untouched.
+// lines, ad placeholders, and stray ">" / ">>" markers used as blockquote
+// prefixes and inline repeat markers. This strips the common junk while leaving
+// the actual chords + lyrics untouched.
 const CLIPBOARD_JUNK_LINE_PATTERNS = [
   /^\s*cifra\s*club\s*$/i,
   /^\s*(ver|vers[ãa]o)\s*\d+\s*$/i,
@@ -116,7 +116,7 @@ const CLIPBOARD_JUNK_LINE_PATTERNS = [
   /^\s*(baixar|imprimir|compartilhar|enviar)\s*(cifra)?\s*$/i,
   /^\s*(transpor|afina[cç][ãa]o)\s*:?.*$/i,
   /^\s*capo\s*(na)?\s*\d+.*casa.*$/i,
-  /^\s*>{2,}\s*$/,
+  /^\s*>+\s*$/,
   /^\s*\d[\d.,]*\s*(views?|visualiza[cç][õo]es|exibi[cç][õo]es)\s*$/i,
   /^\s*anuncie\s*aqui\s*$/i,
   /^\s*(ouvir|assistir)\s*no\s*(spotify|youtube|deezer)\s*$/i
@@ -129,9 +129,11 @@ export function cleanClipboardCifra(text) {
     .split('\n')
     .filter(line => !CLIPBOARD_JUNK_LINE_PATTERNS.some(re => re.test(line)))
     .join('\n');
-  // ">>" is used inline on Cifra Club as a repeat/continue marker — drop it wherever
-  // it appears rather than only on its own line.
-  t = t.replace(/[ \t]*>{2,}[ \t]*/g, ' ');
+  // ">" never appears in a real chord or lyric. Strip a blockquote-style marker
+  // at the start of a line (keeping the leading whitespace that aligns chords
+  // over lyrics), then collapse any other run of ">" to a single space.
+  t = t.replace(/^([ \t]*)>+[ \t]?/gm, '$1');
+  t = t.replace(/[ \t]*>+[ \t]*/g, ' ');
   t = t.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
   return t.trim();
 }
